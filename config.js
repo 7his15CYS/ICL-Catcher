@@ -1,6 +1,12 @@
 window.APP_CONFIG = {
-  supabaseUrl: 'https://aokrwsometvcbggddous.supabase.co',
-  supabaseAnonKey: 'sb_publishable_OsgukOdKaceCiKR9tVrVOA_kvLoBR8C',
-  lineProvider: 'custom:line',
-  siteName: 'ICL會員點數中心'
+  siteName: 'ICL 會員點數中心',
+  // GitHub Pages 前端會用到
+  supabaseUrl: 'https://uxqrrhmzdvdstfsfopky.supabase.co',
+  supabaseAnonKey: 'sb_publishable_GmleewX4CqVQdyOz8Xlu7A_mNPCcJjB',
+
+  // LINE LIFF
+  liffId: 'YOUR_LIFF_ID',
+
+  // Edge Function 名稱
+  apiFunctionName: 'line-api'
 };
