@@ -36,26 +36,37 @@ const state = {
 function normalizeError(err, fallback = '發生錯誤') {
   if (err == null) return fallback;
 
-  if (typeof err === 'string') return err;
+  if (typeof err === 'string') {
+    return err === '[object Object]' ? fallback : err;
+  }
 
   if (err instanceof Error) {
-    return err.message || fallback;
+    return err.message && err.message !== '[object Object]'
+      ? err.message
+      : fallback;
   }
 
   if (typeof err === 'object') {
-    if (typeof err.message === 'string') return err.message;
+    if (err.debug && typeof err.debug === 'object') {
+      if (typeof err.debug.message === 'string' && err.debug.message !== '[object Object]') {
+        return err.debug.message;
+      }
+      if (typeof err.debug.error_description === 'string') {
+        return err.debug.error_description;
+      }
+      if (typeof err.debug.error === 'string') {
+        return err.debug.error;
+      }
+      try {
+        return JSON.stringify(err.debug, null, 2);
+      } catch {}
+    }
+
+    if (typeof err.message === 'string' && err.message !== '[object Object]') {
+      return err.message;
+    }
     if (typeof err.error_description === 'string') return err.error_description;
     if (typeof err.error === 'string') return err.error;
-
-    if (err.message && typeof err.message === 'object') {
-      return normalizeError(err.message, fallback);
-    }
-
-    if (err.debug && typeof err.debug === 'object') {
-      if (typeof err.debug.message === 'string') return err.debug.message;
-      if (typeof err.debug.error_description === 'string') return err.debug.error_description;
-      if (typeof err.debug.error === 'string') return err.debug.error;
-    }
 
     try {
       return JSON.stringify(err, null, 2);
@@ -72,7 +83,7 @@ function showMessage(message, isError = false) {
 
   const finalMessage =
     typeof message === 'string'
-      ? message
+      ? (message === '[object Object]' ? (isError ? '發生錯誤' : '') : message)
       : normalizeError(message, isError ? '發生錯誤' : '');
 
   els.messageBox.textContent = finalMessage || '';
