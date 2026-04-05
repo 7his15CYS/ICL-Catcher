@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>娃娃機會員點數中心</title>
+    <meta name="description" content="LINE 登入的娃娃機會員點數網站，可查點數、兌換商品、看排行榜。" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <header class="hero card">
+        <div>
+          <p class="eyebrow">Claw Machine Club</p>
+          <h1>娃娃機會員點數中心</h1>
+          <p class="muted">
+            用 LINE 直接登入，查看你的點數、可兌換商品、兌換紀錄與排行榜。
+          </p>
+        </div>
+        <div class="hero-actions" id="authArea">
+          <button id="loginBtn" class="btn primary">使用 LINE 登入</button>
+          <button id="logoutBtn" class="btn ghost hidden">登出</button>
+        </div>
+      </header>
+
+      <section id="messageBox" class="message hidden"></section>
+
+      <section id="guestSection" class="card">
+        <h2>開始前你要準備</h2>
+        <ol>
+          <li>GitHub 帳號（你已經有 GitHub Pages）</li>
+          <li>Supabase 免費帳號</li>
+          <li>LINE Developers 帳號與 LINE Login Channel</li>
+        </ol>
+        <p class="muted">
+          你登入後，系統會自動建立會員資料。第一次登入後，如果還沒有點數，畫面會顯示 0。
+        </p>
+      </section>
+
+      <section id="memberSection" class="hidden grid two-col">
+        <div class="card profile-card">
+          <div class="profile-header">
+            <img id="avatar" class="avatar" src="" alt="會員頭像" />
+            <div>
+              <h2 id="displayName">會員</h2>
+              <p id="memberSince" class="muted"></p>
+            </div>
+          </div>
+
+          <div class="stats-grid">
+            <div class="stat">
+              <span class="label">目前點數</span>
+              <strong id="pointsValue">0</strong>
+            </div>
+            <div class="stat">
+              <span class="label">本月排名</span>
+              <strong id="rankValue">-</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>排行榜 Top 10</h2>
+          <div id="leaderboard" class="list"></div>
+        </div>
+
+        <div class="card full-width">
+          <div class="section-title-row">
+            <h2>可兌換商品</h2>
+            <button id="reloadRewardsBtn" class="btn small ghost">重新整理</button>
+          </div>
+          <div id="rewardsGrid" class="reward-grid"></div>
+        </div>
+
+        <div class="card full-width">
+          <h2>我的兌換紀錄</h2>
+          <div id="historyList" class="list"></div>
+        </div>
+      </section>
+
+      <section id="adminSection" class="card hidden">
+        <div class="section-title-row">
+          <h2>管理員加點區</h2>
+          <span class="badge">只有 admin 看得到</span>
+        </div>
+
+        <div class="admin-search">
+          <input id="memberKeyword" type="text" placeholder="輸入會員名稱關鍵字" />
+          <button id="searchMemberBtn" class="btn">搜尋會員</button>
+        </div>
+
+        <div id="memberResults" class="list"></div>
+
+        <div id="grantPanel" class="grant-panel hidden">
+          <h3>加點</h3>
+          <p>目前選擇：<strong id="selectedMemberName">-</strong></p>
+          <div class="grant-form">
+            <input id="grantPointsInput" type="number" min="1" step="1" placeholder="點數，例如 10" />
+            <input id="grantReasonInput" type="text" maxlength="120" placeholder="原因，例如：夾出大娃娃 1 隻" />
+            <button id="grantPointsBtn" class="btn primary">送出加點</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
