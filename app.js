@@ -331,16 +331,18 @@ async function grantPoints() {
     if (!points || points <= 0) throw new Error('請填入大於 0 的點數');
     if (!reason) throw new Error('請填入加點原因');
 
-    await callApi('grant_points', {
+    const result = await callApi('grant_points', {
       memberId,
       points,
       reason,
       adminLineUserId: state.profile.userId,
     });
 
-    showMessage('加點成功');
+    showMessage(result.message || '加點成功');
+
     if (els.grantPointsValue) els.grantPointsValue.value = '';
     if (els.grantPointsReason) els.grantPointsReason.value = '';
+
     await bootstrapDashboard();
   } catch (error) {
     console.error('grantPoints error =', error);
