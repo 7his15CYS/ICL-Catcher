@@ -53,6 +53,20 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function getCleanAppUrl() {
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
+function isPrimaryRedirectUrl() {
+  const url = new URL(window.location.href);
+  return (
+    url.searchParams.has('code') ||
+    url.searchParams.has('state') ||
+    url.searchParams.has('liffClientId') ||
+    url.searchParams.has('liffRedirectUri')
+  );
+}
+
 async function callApi(action, payload = {}) {
   const url = `${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`;
 
@@ -339,7 +353,7 @@ async function signIn() {
 
     if (!liff.isLoggedIn()) {
       liff.login({
-        redirectUri: window.location.href.split('#')[0],
+        redirectUri: getCleanAppUrl(),
       });
       return;
     }
@@ -382,6 +396,12 @@ async function bootstrap() {
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
 
     await liff.init({ liffId: config.liffId });
+
+    // 處理 LIFF primary redirect URL
+    if (isPrimaryRedirectUrl()) {
+      window.location.replace(getCleanAppUrl());
+      return;
+    }
 
     if (!liff.isLoggedIn()) {
       renderLoggedOut();
