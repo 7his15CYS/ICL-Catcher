@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>娃娃機會員點數中心</title>
+  <title>ICL嚴選好物-會員中心</title>
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="./config.js"></script>
@@ -12,10 +12,11 @@
   <main class="page" id="app-ready" style="display:block;">
     <section class="hero-card">
       <div class="hero-content">
-        <p class="eyebrow">CLAW MACHINE CLUB</p>
-        <h1>娃娃機會員點數中心</h1>
-        <p class="hero-text">用 LINE 登入，查看點數、可兌換商品、兌換紀錄與排行榜。</p>
+        <p class="eyebrow">ICL CLUB</p>
+        <h1>ICL嚴選好物-會員中心</h1>
+        <p class="hero-text">好玩好開心：查看點數、兌換商品、兌換紀錄與排行榜。</p>
       </div>
+
       <div class="hero-actions" id="auth-section">
         <button class="btn btn-primary" id="login-btn">使用 LINE 登入</button>
         <button class="btn btn-secondary" id="logout-btn" style="display:none;">登出</button>
@@ -26,7 +27,13 @@
 
     <section class="card" id="member-section" style="display:none;">
       <div class="member-header">
-        <img id="member-avatar" class="member-avatar" src="https://placehold.co/96x96?text=User" alt="會員頭像" />
+        <img
+          id="member-avatar"
+          class="member-avatar"
+          src="https://placehold.co/96x96?text=User"
+          alt="會員頭像"
+        />
+
         <div class="member-info">
           <h2 id="member-name">-</h2>
           <p class="points-label">目前點數</p>
@@ -56,7 +63,12 @@
       <div class="admin-block">
         <h3>搜尋會員</h3>
         <div class="row">
-          <input type="text" id="admin-search-input" class="input" placeholder="輸入會員名稱" />
+          <input
+            type="text"
+            id="admin-search-input"
+            class="input"
+            placeholder="輸入會員名稱"
+          />
           <button class="btn btn-secondary" id="admin-search-btn">搜尋</button>
         </div>
         <div id="admin-search-results" class="list-wrap"></div>
@@ -65,9 +77,24 @@
       <div class="admin-block">
         <h3>手動加點</h3>
         <div class="form-grid">
-          <input type="text" id="grant-points-member-id" class="input" placeholder="會員 ID" />
-          <input type="number" id="grant-points-value" class="input" placeholder="點數" />
-          <input type="text" id="grant-points-reason" class="input" placeholder="原因" />
+          <input
+            type="text"
+            id="grant-points-member-id"
+            class="input"
+            placeholder="會員 ID"
+          />
+          <input
+            type="number"
+            id="grant-points-value"
+            class="input"
+            placeholder="點數"
+          />
+          <input
+            type="text"
+            id="grant-points-reason"
+            class="input"
+            placeholder="原因"
+          />
         </div>
         <button class="btn btn-primary" id="grant-points-btn">確認加點</button>
       </div>
