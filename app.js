@@ -73,10 +73,9 @@ async function callApi(action, payload = {}) {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
-      apikey: config.supabaseAnonKey,
-      Authorization: `Bearer ${config.supabaseAnonKey}`,
-    },
+  'Content-Type': 'application/json',
+  apikey: config.supabaseAnonKey,
+},
     body: JSON.stringify({
       action,
       accessToken: state.accessToken,
