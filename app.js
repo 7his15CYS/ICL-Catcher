@@ -71,14 +71,19 @@ function normalizeError(err, fallback = '發生錯誤') {
   if (!err) return fallback;
   if (typeof err === 'string') return err;
   if (err instanceof Error) return err.message || fallback;
+
   if (typeof err === 'object') {
     if (typeof err.message === 'string') return err.message;
+    if (typeof err.error_description === 'string') return err.error_description;
+    if (typeof err.error === 'string') return err.error;
+
     try {
       return JSON.stringify(err);
     } catch {
       return fallback;
     }
   }
+
   return fallback;
 }
 
@@ -100,6 +105,7 @@ async function callApi(action, payload = {}) {
 
   const text = await res.text();
   let data = {};
+
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
@@ -107,13 +113,7 @@ async function callApi(action, payload = {}) {
   }
 
   if (!res.ok || data.ok === false) {
-    throw new Error(
-      data.message ||
-      data.error_description ||
-      data.error ||
-      data.raw ||
-      `API 失敗：${res.status}`
-    );
+    throw data;
   }
 
   return data;
@@ -343,7 +343,7 @@ async function grantPoints() {
     if (els.grantPointsReason) els.grantPointsReason.value = '';
     await bootstrapDashboard();
   } catch (error) {
-    console.error(error);
+    console.error('grantPoints error =', error);
     showMessage(normalizeError(error, '加點失敗'), true);
   }
 }
