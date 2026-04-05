@@ -5,7 +5,7 @@ window.APP_CONFIG = {
   supabaseAnonKey: 'sb_publishable_GmleewX4CqVQdyOz8Xlu7A_mNPCcJjB',
 
   // LINE LIFF
-  liffId: 'YOUR_LIFF_ID',
+  liffId: '2009696707-5igDm7EE',
 
   // Edge Function 名稱
   apiFunctionName: 'line-api'
