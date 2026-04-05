@@ -282,3 +282,17 @@ h3 {
     align-items: flex-start;
   }
 }
+
+.member-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.member-info {
+  flex: 1;
+}
+
+.member-actions {
+  margin-left: auto;
+}
