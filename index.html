@@ -1,102 +1,92 @@
 <!doctype html>
 <html lang="zh-Hant">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>娃娃機會員點數中心</title>
-    <link rel="stylesheet" href="./styles.css" />
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <script src="./config.js"></script>
-  </head>
-  <body>
-    <div class="container">
-      <header class="hero card">
-        <div>
-          <div class="eyebrow">CLAW MACHINE CLUB</div>
-          <h1 id="site-title">娃娃機會員點數中心</h1>
-          <p class="muted">用 LINE 登入，查看點數、可兌換商品、兌換紀錄與排行榜。</p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>娃娃機會員點數中心</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="./config.js"></script>
+</head>
+<body>
+  <main class="page" id="app-ready" style="display:block;">
+    <section class="hero-card">
+      <div class="hero-content">
+        <p class="eyebrow">CLAW MACHINE CLUB</p>
+        <h1>娃娃機會員點數中心</h1>
+        <p class="hero-text">用 LINE 登入，查看點數、可兌換商品、兌換紀錄與排行榜。</p>
+      </div>
+      <div class="hero-actions" id="auth-section">
+        <button class="btn btn-primary" id="login-btn">使用 LINE 登入</button>
+        <button class="btn btn-secondary" id="logout-btn" style="display:none;">登出</button>
+      </div>
+    </section>
+
+    <div class="message" id="message-box" style="display:none;"></div>
+
+    <section class="card" id="member-section" style="display:none;">
+      <div class="member-header">
+        <img id="member-avatar" class="member-avatar" src="https://placehold.co/96x96?text=User" alt="會員頭像" />
+        <div class="member-info">
+          <h2 id="member-name">-</h2>
+          <p class="points-label">目前點數</p>
+          <div class="points-value"><span id="member-points">0</span> 點</div>
         </div>
-        <div class="actions">
-          <button id="login-btn" class="primary-btn">使用 LINE 登入</button>
-          <button id="logout-btn" class="ghost-btn hidden">登出</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>可兌換商品</h2>
+      <div id="rewards-list" class="reward-grid"></div>
+    </section>
+
+    <section class="card">
+      <h2>兌換紀錄</h2>
+      <div id="redemption-list" class="list-wrap"></div>
+    </section>
+
+    <section class="card">
+      <h2>排行榜</h2>
+      <div id="leaderboard-list" class="list-wrap"></div>
+    </section>
+
+    <section class="card" id="admin-section" style="display:none;">
+      <h2>管理員功能</h2>
+
+      <div class="admin-block">
+        <h3>搜尋會員</h3>
+        <div class="row">
+          <input type="text" id="admin-search-input" class="input" placeholder="輸入會員名稱" />
+          <button class="btn btn-secondary" id="admin-search-btn">搜尋</button>
         </div>
-      </header>
+        <div id="admin-search-results" class="list-wrap"></div>
+      </div>
 
-      <div id="message" class="message hidden"></div>
-
-      <section id="logged-out" class="card">
-        <h2>開始前你要準備</h2>
-        <ol>
-          <li>GitHub Pages 網址</li>
-          <li>Supabase 專案</li>
-          <li>LINE Login channel + LIFF app</li>
-          <li>Supabase Edge Function：line-api</li>
-        </ol>
-        <p class="muted">這一版不走 Supabase Auth，而是用 LIFF 取得 LINE 身分，再由 Edge Function 在伺服器端驗證 token。</p>
-      </section>
-
-      <section id="dashboard" class="hidden">
-        <div class="grid two">
-          <div class="card profile-card">
-            <div class="profile-row">
-              <img id="member-avatar" class="avatar" alt="avatar" />
-              <div>
-                <h2 id="member-name">會員</h2>
-                <p id="member-subtitle" class="muted"></p>
-              </div>
-            </div>
-            <div class="stats">
-              <div class="stat-box">
-                <div class="stat-label">目前點數</div>
-                <div id="member-points" class="stat-value">0</div>
-              </div>
-              <div class="stat-box">
-                <div class="stat-label">會員狀態</div>
-                <div id="member-role" class="stat-value small">一般會員</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card">
-            <h2>排行榜</h2>
-            <div id="leaderboard"></div>
-          </div>
+      <div class="admin-block">
+        <h3>手動加點</h3>
+        <div class="form-grid">
+          <input type="text" id="grant-points-member-id" class="input" placeholder="會員 ID" />
+          <input type="number" id="grant-points-value" class="input" placeholder="點數" />
+          <input type="text" id="grant-points-reason" class="input" placeholder="原因" />
         </div>
+        <button class="btn btn-primary" id="grant-points-btn">確認加點</button>
+      </div>
+    </section>
 
-        <div class="grid two">
-          <div class="card">
-            <h2>可兌換商品</h2>
-            <div id="rewards" class="rewards-grid"></div>
-          </div>
+    <section class="card">
+      <h2>開始前你要準備</h2>
+      <ol class="guide-list">
+        <li>GitHub Pages 網址</li>
+        <li>Supabase 專案</li>
+        <li>LINE Login channel + LIFF app</li>
+        <li>Supabase Edge Function：line-api</li>
+      </ol>
+      <p class="muted">
+        這一版不走 Supabase Auth，而是用 LIFF 取得 LINE 身分，再由 Edge Function 在伺服器端驗證 token。
+      </p>
+    </section>
+  </main>
 
-          <div class="card">
-            <h2>我的兌換紀錄</h2>
-            <div id="redemptions"></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>點數流水</h2>
-          <div id="ledger"></div>
-        </div>
-
-        <div id="admin-panel" class="card hidden">
-          <h2>管理員加點</h2>
-          <div class="admin-search-row">
-            <input id="member-search-keyword" type="text" placeholder="輸入會員名稱" />
-            <button id="member-search-btn" class="secondary-btn">搜尋會員</button>
-          </div>
-          <div id="member-search-results"></div>
-          <div class="admin-form">
-            <input id="grant-target-id" type="text" placeholder="會員 ID（由搜尋結果帶入）" readonly />
-            <input id="grant-points" type="number" placeholder="加點數量" min="1" />
-            <input id="grant-reason" type="text" placeholder="原因，例如：夾中娃娃 1 次" />
-            <button id="grant-btn" class="primary-btn">送出加點</button>
-          </div>
-        </div>
-      </section>
-    </div>
-
-    <script src="./app.js"></script>
-  </body>
+  <script src="./app.js"></script>
+</body>
 </html>
