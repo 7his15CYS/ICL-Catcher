@@ -57,7 +57,7 @@ function getCleanAppUrl() {
   return `${window.location.origin}${window.location.pathname}`;
 }
 
-function isPrimaryRedirectUrl() {
+function hasLiffRedirectParams() {
   const url = new URL(window.location.href);
   return (
     url.searchParams.has('code') ||
@@ -117,29 +117,27 @@ function renderRewards(rewards = []) {
     return;
   }
 
-  els.rewardsList.innerHTML = rewards
-    .map((reward) => {
-      const disabled = Number(reward.stock ?? 0) <= 0 ? 'disabled' : '';
-      const imageUrl = reward.image_url || 'https://placehold.co/600x400?text=Reward';
+  els.rewardsList.innerHTML = rewards.map((reward) => {
+    const disabled = Number(reward.stock ?? 0) <= 0 ? 'disabled' : '';
+    const imageUrl = reward.image_url || 'https://placehold.co/600x400?text=Reward';
 
-      return `
-        <div class="reward-card">
-          <img class="reward-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(reward.name)}">
-          <div class="reward-body">
-            <h3>${escapeHtml(reward.name)}</h3>
-            <p>${escapeHtml(reward.description || '')}</p>
-            <div class="reward-meta">
-              <span>${escapeHtml(reward.points_cost)} 點</span>
-              <span>庫存 ${escapeHtml(reward.stock)}</span>
-            </div>
-            <button class="btn btn-primary redeem-btn" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
-              ${Number(reward.stock ?? 0) > 0 ? '兌換' : '已無庫存'}
-            </button>
+    return `
+      <div class="reward-card">
+        <img class="reward-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(reward.name)}">
+        <div class="reward-body">
+          <h3>${escapeHtml(reward.name)}</h3>
+          <p>${escapeHtml(reward.description || '')}</p>
+          <div class="reward-meta">
+            <span>${escapeHtml(reward.points_cost)} 點</span>
+            <span>庫存 ${escapeHtml(reward.stock)}</span>
           </div>
+          <button class="btn btn-primary redeem-btn" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
+            ${Number(reward.stock ?? 0) > 0 ? '兌換' : '已無庫存'}
+          </button>
         </div>
-      `;
-    })
-    .join('');
+      </div>
+    `;
+  }).join('');
 
   els.rewardsList.querySelectorAll('.redeem-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -157,19 +155,15 @@ function renderRedemptions(redemptions = []) {
     return;
   }
 
-  els.redemptionList.innerHTML = redemptions
-    .map((item) => {
-      return `
-        <div class="list-item">
-          <div>
-            <div class="list-title">${escapeHtml(item.reward_name)}</div>
-            <div class="list-subtitle">${escapeHtml(item.status)} ・ ${new Date(item.created_at).toLocaleString()}</div>
-          </div>
-          <div class="list-points">-${escapeHtml(item.points_spent)} 點</div>
-        </div>
-      `;
-    })
-    .join('');
+  els.redemptionList.innerHTML = redemptions.map((item) => `
+    <div class="list-item">
+      <div>
+        <div class="list-title">${escapeHtml(item.reward_name)}</div>
+        <div class="list-subtitle">${escapeHtml(item.status)} ・ ${new Date(item.created_at).toLocaleString()}</div>
+      </div>
+      <div class="list-points">-${escapeHtml(item.points_spent)} 點</div>
+    </div>
+  `).join('');
 }
 
 function renderLeaderboard(leaderboard = []) {
@@ -180,22 +174,18 @@ function renderLeaderboard(leaderboard = []) {
     return;
   }
 
-  els.leaderboardList.innerHTML = leaderboard
-    .map((item, index) => {
-      return `
-        <div class="list-item">
-          <div class="leaderboard-user">
-            <span class="leaderboard-rank">#${index + 1}</span>
-            <img class="leaderboard-avatar" src="${escapeHtml(item.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(item.display_name)}">
-            <div>
-              <div class="list-title">${escapeHtml(item.display_name)}</div>
-            </div>
-          </div>
-          <div class="list-points">${escapeHtml(item.points)} 點</div>
+  els.leaderboardList.innerHTML = leaderboard.map((item, index) => `
+    <div class="list-item">
+      <div class="leaderboard-user">
+        <span class="leaderboard-rank">#${index + 1}</span>
+        <img class="leaderboard-avatar" src="${escapeHtml(item.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(item.display_name)}">
+        <div>
+          <div class="list-title">${escapeHtml(item.display_name)}</div>
         </div>
-      `;
-    })
-    .join('');
+      </div>
+      <div class="list-points">${escapeHtml(item.points)} 點</div>
+    </div>
+  `).join('');
 }
 
 function renderAdminSearchResults(members = []) {
@@ -206,31 +196,25 @@ function renderAdminSearchResults(members = []) {
     return;
   }
 
-  els.adminSearchResults.innerHTML = members
-    .map((member) => {
-      return `
-        <div class="list-item">
-          <div class="leaderboard-user">
-            <img class="leaderboard-avatar" src="${escapeHtml(member.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(member.display_name)}">
-            <div>
-              <div class="list-title">${escapeHtml(member.display_name)}</div>
-              <div class="list-subtitle">${escapeHtml(member.id)}</div>
-            </div>
-          </div>
-          <button class="btn btn-secondary select-member-btn" data-member-id="${escapeHtml(member.id)}">
-            選取
-          </button>
+  els.adminSearchResults.innerHTML = members.map((member) => `
+    <div class="list-item">
+      <div class="leaderboard-user">
+        <img class="leaderboard-avatar" src="${escapeHtml(member.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(member.display_name)}">
+        <div>
+          <div class="list-title">${escapeHtml(member.display_name)}</div>
+          <div class="list-subtitle">${escapeHtml(member.id)}</div>
         </div>
-      `;
-    })
-    .join('');
+      </div>
+      <button class="btn btn-secondary select-member-btn" data-member-id="${escapeHtml(member.id)}">
+        選取
+      </button>
+    </div>
+  `).join('');
 
   els.adminSearchResults.querySelectorAll('.select-member-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const memberId = btn.getAttribute('data-member-id');
-      if (els.grantPointsMemberId) {
-        els.grantPointsMemberId.value = memberId || '';
-      }
+      if (els.grantPointsMemberId) els.grantPointsMemberId.value = memberId || '';
       showMessage('已帶入會員 ID');
     });
   });
@@ -271,10 +255,7 @@ async function bootstrapDashboard() {
 async function redeemReward(rewardId) {
   try {
     clearMessage();
-
-    if (!state.dashboard?.member?.id) {
-      throw new Error('尚未取得會員資料');
-    }
+    if (!state.dashboard?.member?.id) throw new Error('尚未取得會員資料');
 
     await callApi('redeem', {
       memberId: state.dashboard.member.id,
@@ -292,10 +273,7 @@ async function redeemReward(rewardId) {
 async function searchMembers() {
   try {
     clearMessage();
-
-    if (!state.profile?.userId) {
-      throw new Error('尚未取得 LINE 使用者資訊');
-    }
+    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
 
     const keyword = els.adminSearchInput?.value?.trim() || '';
     const data = await callApi('search_members', {
@@ -313,10 +291,7 @@ async function searchMembers() {
 async function grantPoints() {
   try {
     clearMessage();
-
-    if (!state.profile?.userId) {
-      throw new Error('尚未取得 LINE 使用者資訊');
-    }
+    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
 
     const memberId = els.grantPointsMemberId?.value?.trim();
     const points = Number(els.grantPointsValue?.value || 0);
@@ -346,15 +321,10 @@ async function grantPoints() {
 async function signIn() {
   try {
     clearMessage();
-
-    if (!window.liff) {
-      throw new Error('LIFF SDK 尚未載入');
-    }
+    if (!window.liff) throw new Error('LIFF SDK 尚未載入');
 
     if (!liff.isLoggedIn()) {
-      liff.login({
-        redirectUri: getCleanAppUrl(),
-      });
+      liff.login({ redirectUri: getCleanAppUrl() });
       return;
     }
 
@@ -397,10 +367,12 @@ async function bootstrap() {
 
     await liff.init({ liffId: config.liffId });
 
-    // 處理 LIFF primary redirect URL
-    if (isPrimaryRedirectUrl()) {
-      window.location.replace(getCleanAppUrl());
-      return;
+    // 只要 LIFF 已登入，就把網址清乾淨再繼續
+    if (liff.isLoggedIn()) {
+      const cleanUrl = getCleanAppUrl();
+      if (window.location.href !== cleanUrl) {
+        window.history.replaceState({}, document.title, cleanUrl);
+      }
     }
 
     if (!liff.isLoggedIn()) {
