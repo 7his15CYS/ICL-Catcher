@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ICL嚴選好物-會員中心</title>
+  <title>娃娃機會員點數中心</title>
   <link rel="stylesheet" href="./styles.css" />
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <script src="./config.js"></script>
@@ -14,12 +14,11 @@
       <div class="hero-content">
         <p class="eyebrow">ICL CLUB</p>
         <h1>ICL嚴選好物-會員中心</h1>
-        <p class="hero-text">好玩好開心：查看點數、兌換商品、兌換紀錄與排行榜。</p>
+        <p class="hero-text">好玩好開心，查看點數、兌換商品、兌換紀錄與排行榜。</p>
       </div>
 
       <div class="hero-actions" id="auth-section">
         <button class="btn btn-primary" id="login-btn">使用 LINE 登入</button>
-        <button class="btn btn-secondary" id="logout-btn" style="display:none;">登出</button>
       </div>
     </section>
 
@@ -38,6 +37,10 @@
           <h2 id="member-name">-</h2>
           <p class="points-label">目前點數</p>
           <div class="points-value"><span id="member-points">0</span> 點</div>
+        </div>
+
+        <div class="member-actions">
+          <button class="btn btn-secondary" id="logout-btn" style="display:none;">登出</button>
         </div>
       </div>
     </section>
