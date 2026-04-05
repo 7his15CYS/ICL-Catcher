@@ -67,15 +67,30 @@ function hasLiffRedirectParams() {
   );
 }
 
+function normalizeError(err, fallback = '發生錯誤') {
+  if (!err) return fallback;
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message || fallback;
+  if (typeof err === 'object') {
+    if (typeof err.message === 'string') return err.message;
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
 async function callApi(action, payload = {}) {
   const url = `${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`;
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
-  'Content-Type': 'application/json',
-  apikey: config.supabaseAnonKey,
-},
+      'Content-Type': 'application/json',
+      apikey: config.supabaseAnonKey,
+    },
     body: JSON.stringify({
       action,
       accessToken: state.accessToken,
@@ -83,10 +98,22 @@ async function callApi(action, payload = {}) {
     }),
   });
 
-  const data = await res.json().catch(() => ({}));
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { raw: text };
+  }
 
   if (!res.ok || data.ok === false) {
-    throw new Error(data.message || `API 失敗：${res.status}`);
+    throw new Error(
+      data.message ||
+      data.error_description ||
+      data.error ||
+      data.raw ||
+      `API 失敗：${res.status}`
+    );
   }
 
   return data;
@@ -230,8 +257,12 @@ function renderDashboard(data) {
   const member = data.member || {};
   if (els.memberName) els.memberName.textContent = member.display_name || 'LINE 會員';
   if (els.memberPoints) els.memberPoints.textContent = String(data.points ?? 0);
+
   if (els.memberAvatar) {
-    els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
+    els.memberAvatar.src =
+      member.avatar_url ||
+      member.picture_url ||
+      'https://placehold.co/96x96?text=User';
     els.memberAvatar.alt = member.display_name || '會員頭像';
   }
 
@@ -265,7 +296,7 @@ async function redeemReward(rewardId) {
     await bootstrapDashboard();
   } catch (error) {
     console.error(error);
-    showMessage(error.message || '兌換失敗', true);
+    showMessage(normalizeError(error, '兌換失敗'), true);
   }
 }
 
@@ -283,7 +314,7 @@ async function searchMembers() {
     renderAdminSearchResults(data.members || []);
   } catch (error) {
     console.error(error);
-    showMessage(error.message || '搜尋會員失敗', true);
+    showMessage(normalizeError(error, '搜尋會員失敗'), true);
   }
 }
 
@@ -313,7 +344,7 @@ async function grantPoints() {
     await bootstrapDashboard();
   } catch (error) {
     console.error(error);
-    showMessage(error.message || '加點失敗', true);
+    showMessage(normalizeError(error, '加點失敗'), true);
   }
 }
 
@@ -330,7 +361,7 @@ async function signIn() {
     await bootstrap();
   } catch (error) {
     console.error(error);
-    showMessage(error.message || 'LINE 登入失敗', true);
+    showMessage(normalizeError(error, 'LINE 登入失敗'), true);
   }
 }
 
@@ -350,7 +381,7 @@ async function signOut() {
     showMessage('已登出');
   } catch (error) {
     console.error(error);
-    showMessage(error.message || '登出失敗', true);
+    showMessage(normalizeError(error, '登出失敗'), true);
   }
 }
 
@@ -364,14 +395,13 @@ async function bootstrap() {
     if (!config?.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
 
-    await liff.init({ liffId: config.liffId });
+    await liff.init({
+      liffId: config.liffId,
+      withLoginOnExternalBrowser: true,
+    });
 
-    // 只要 LIFF 已登入，就把網址清乾淨再繼續
-    if (liff.isLoggedIn()) {
-      const cleanUrl = getCleanAppUrl();
-      if (window.location.href !== cleanUrl) {
-        window.history.replaceState({}, document.title, cleanUrl);
-      }
+    if (liff.isLoggedIn() && hasLiffRedirectParams()) {
+      window.history.replaceState({}, document.title, getCleanAppUrl());
     }
 
     if (!liff.isLoggedIn()) {
@@ -380,13 +410,16 @@ async function bootstrap() {
     }
 
     state.accessToken = liff.getAccessToken();
-    state.profile = await liff.getProfile();
+    if (!state.accessToken) {
+      throw new Error('無法取得 LINE access token');
+    }
 
+    state.profile = await liff.getProfile();
     await bootstrapDashboard();
   } catch (error) {
     console.error(error);
     renderLoggedOut();
-    showMessage(`初始化失敗：${error.message}`, true);
+    showMessage(`初始化失敗：${normalizeError(error)}`, true);
   } finally {
     if (els.appReady) els.appReady.style.display = 'block';
   }
