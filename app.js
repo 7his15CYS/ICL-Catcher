@@ -67,11 +67,13 @@ function sanitizeText(text) {
 
 async function signInWithLine() {
   clearMessage();
-  const redirectTo = window.location.origin + window.location.pathname;
+  const redirectTo = window.location.href.split('?')[0].split('#')[0];
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider: config.lineProvider,
     options: { redirectTo }
   });
+
   if (error) showMessage(`登入失敗：${error.message}`, true);
 }
 
@@ -331,6 +333,20 @@ async function renderLoggedIn(session) {
 
 async function init() {
   try {
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get('code');
+
+    // OAuth / PKCE callback: 用 code 換 session
+    if (code) {
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError) throw exchangeError;
+
+      // 清掉網址上的 code，避免重複交換
+      url.searchParams.delete('code');
+      url.searchParams.delete('state');
+      window.history.replaceState({}, document.title, url.pathname + url.search);
+    }
+
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
 
