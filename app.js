@@ -33,10 +33,50 @@ const state = {
   dashboard: null,
 };
 
+function normalizeError(err, fallback = '發生錯誤') {
+  if (err == null) return fallback;
+
+  if (typeof err === 'string') return err;
+
+  if (err instanceof Error) {
+    return err.message || fallback;
+  }
+
+  if (typeof err === 'object') {
+    if (typeof err.message === 'string') return err.message;
+    if (typeof err.error_description === 'string') return err.error_description;
+    if (typeof err.error === 'string') return err.error;
+
+    if (err.message && typeof err.message === 'object') {
+      return normalizeError(err.message, fallback);
+    }
+
+    if (err.debug && typeof err.debug === 'object') {
+      if (typeof err.debug.message === 'string') return err.debug.message;
+      if (typeof err.debug.error_description === 'string') return err.debug.error_description;
+      if (typeof err.debug.error === 'string') return err.debug.error;
+    }
+
+    try {
+      return JSON.stringify(err, null, 2);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return String(err);
+}
+
 function showMessage(message, isError = false) {
   if (!els.messageBox) return;
-  els.messageBox.textContent = message || '';
-  els.messageBox.style.display = message ? 'block' : 'none';
+
+  const finalMessage =
+    typeof message === 'string'
+      ? message
+      : normalizeError(message, isError ? '發生錯誤' : '');
+
+  els.messageBox.textContent = finalMessage || '';
+  els.messageBox.style.display = finalMessage ? 'block' : 'none';
   els.messageBox.className = isError ? 'message error' : 'message success';
 }
 
@@ -65,26 +105,6 @@ function hasLiffRedirectParams() {
     url.searchParams.has('liffClientId') ||
     url.searchParams.has('liffRedirectUri')
   );
-}
-
-function normalizeError(err, fallback = '發生錯誤') {
-  if (!err) return fallback;
-  if (typeof err === 'string') return err;
-  if (err instanceof Error) return err.message || fallback;
-
-  if (typeof err === 'object') {
-    if (typeof err.message === 'string') return err.message;
-    if (typeof err.error_description === 'string') return err.error_description;
-    if (typeof err.error === 'string') return err.error;
-
-    try {
-      return JSON.stringify(err);
-    } catch {
-      return fallback;
-    }
-  }
-
-  return fallback;
 }
 
 async function callApi(action, payload = {}) {
@@ -295,7 +315,7 @@ async function redeemReward(rewardId) {
     showMessage('兌換成功');
     await bootstrapDashboard();
   } catch (error) {
-    console.error(error);
+    console.error('redeemReward error =', error);
     showMessage(normalizeError(error, '兌換失敗'), true);
   }
 }
@@ -313,7 +333,7 @@ async function searchMembers() {
 
     renderAdminSearchResults(data.members || []);
   } catch (error) {
-    console.error(error);
+    console.error('searchMembers error =', error);
     showMessage(normalizeError(error, '搜尋會員失敗'), true);
   }
 }
@@ -321,7 +341,10 @@ async function searchMembers() {
 async function grantPoints() {
   try {
     clearMessage();
-    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
+
+    if (!state.profile?.userId) {
+      throw new Error('尚未取得 LINE 使用者資訊');
+    }
 
     const memberId = els.grantPointsMemberId?.value?.trim();
     const points = Number(els.grantPointsValue?.value || 0);
@@ -362,7 +385,7 @@ async function signIn() {
 
     await bootstrap();
   } catch (error) {
-    console.error(error);
+    console.error('signIn error =', error);
     showMessage(normalizeError(error, 'LINE 登入失敗'), true);
   }
 }
@@ -382,7 +405,7 @@ async function signOut() {
     renderLoggedOut();
     showMessage('已登出');
   } catch (error) {
-    console.error(error);
+    console.error('signOut error =', error);
     showMessage(normalizeError(error, '登出失敗'), true);
   }
 }
@@ -419,7 +442,7 @@ async function bootstrap() {
     state.profile = await liff.getProfile();
     await bootstrapDashboard();
   } catch (error) {
-    console.error(error);
+    console.error('bootstrap error =', error);
     renderLoggedOut();
     showMessage(`初始化失敗：${normalizeError(error)}`, true);
   } finally {
