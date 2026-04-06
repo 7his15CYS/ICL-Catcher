@@ -66,7 +66,10 @@
     </section>
 
     <section class="card">
-      <h2>可兌換商品</h2>
+      <div class="section-header">
+        <h2>可兌換商品</h2>
+        <a class="more-link" href="./shop.html">更多商品 →</a>
+      </div>
       <div id="rewards-list" class="reward-grid"></div>
     </section>
 
@@ -101,24 +104,9 @@
         <div class="admin-block admin-panel">
           <h3>手動加點</h3>
           <div class="form-grid single-col">
-            <input
-              type="text"
-              id="grant-points-member-id"
-              class="input"
-              placeholder="會員 ID"
-            />
-            <input
-              type="number"
-              id="grant-points-value"
-              class="input"
-              placeholder="加點點數"
-            />
-            <input
-              type="text"
-              id="grant-points-reason"
-              class="input"
-              placeholder="加點原因"
-            />
+            <input type="text" id="grant-points-member-id" class="input" placeholder="會員 ID" />
+            <input type="number" id="grant-points-value" class="input" placeholder="加點點數" />
+            <input type="text" id="grant-points-reason" class="input" placeholder="加點原因" />
           </div>
           <button class="btn btn-primary" id="grant-points-btn">確認加點</button>
         </div>
@@ -126,24 +114,9 @@
         <div class="admin-block admin-panel">
           <h3>手動扣點</h3>
           <div class="form-grid single-col">
-            <input
-              type="text"
-              id="deduct-points-member-id"
-              class="input"
-              placeholder="會員 ID"
-            />
-            <input
-              type="number"
-              id="deduct-points-value"
-              class="input"
-              placeholder="扣點點數"
-            />
-            <input
-              type="text"
-              id="deduct-points-reason"
-              class="input"
-              placeholder="扣點原因"
-            />
+            <input type="text" id="deduct-points-member-id" class="input" placeholder="會員 ID" />
+            <input type="number" id="deduct-points-value" class="input" placeholder="扣點點數" />
+            <input type="text" id="deduct-points-reason" class="input" placeholder="扣點原因" />
           </div>
           <button class="btn btn-danger" id="deduct-points-btn">確認扣點</button>
         </div>
