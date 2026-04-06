@@ -12,54 +12,30 @@ const els = {
   memberAvatar: document.getElementById('member-avatar'),
   memberPoints: document.getElementById('member-points'),
 
-  nicknameInput: document.getElementById('nickname-input'),
-  nicknameSaveBtn: document.getElementById('nickname-save-btn'),
-
-  rewardsList: document.getElementById('rewards-list'),
-  redemptionList: document.getElementById('redemption-list'),
-  leaderboardList: document.getElementById('leaderboard-list'),
-
-  adminSection: document.getElementById('admin-section'),
-  adminSearchInput: document.getElementById('admin-search-input'),
-  adminSearchBtn: document.getElementById('admin-search-btn'),
-  adminSearchResults: document.getElementById('admin-search-results'),
-
-  grantPointsMemberId: document.getElementById('grant-points-member-id'),
-  grantPointsValue: document.getElementById('grant-points-value'),
-  grantPointsReason: document.getElementById('grant-points-reason'),
-  grantPointsBtn: document.getElementById('grant-points-btn'),
-
-  deductPointsMemberId: document.getElementById('deduct-points-member-id'),
-  deductPointsValue: document.getElementById('deduct-points-value'),
-  deductPointsReason: document.getElementById('deduct-points-reason'),
-  deductPointsBtn: document.getElementById('deduct-points-btn'),
+  shopRewardsList: document.getElementById('shop-rewards-list'),
+  shopSectionTitle: document.getElementById('shop-section-title'),
+  categoryTabs: document.getElementById('category-tabs'),
 };
 
 const state = {
   accessToken: null,
   profile: null,
   dashboard: null,
+  allRewards: [],
+  selectedCategory: '全部',
 };
 
 function normalizeError(err, fallback = '發生錯誤') {
   if (err == null) return fallback;
-
   if (typeof err === 'string') return err === '[object Object]' ? fallback : err;
-
-  if (err instanceof Error) {
-    return err.message && err.message !== '[object Object]' ? err.message : fallback;
-  }
+  if (err instanceof Error) return err.message && err.message !== '[object Object]' ? err.message : fallback;
 
   if (typeof err === 'object') {
     if (err.debug && typeof err.debug === 'object') {
       if (typeof err.debug.message === 'string' && err.debug.message !== '[object Object]') return err.debug.message;
       if (typeof err.debug.error_description === 'string') return err.debug.error_description;
       if (typeof err.debug.error === 'string') return err.debug.error;
-      try {
-        return JSON.stringify(err.debug, null, 2);
-      } catch {}
     }
-
     if (typeof err.message === 'string' && err.message !== '[object Object]') return err.message;
     if (typeof err.error_description === 'string') return err.error_description;
     if (typeof err.error === 'string') return err.error;
@@ -76,7 +52,6 @@ function normalizeError(err, fallback = '發生錯誤') {
 
 function showMessage(message, isError = false) {
   if (!els.messageBox) return;
-
   const finalMessage =
     typeof message === 'string'
       ? (message === '[object Object]' ? (isError ? '發生錯誤' : '') : message)
@@ -149,31 +124,59 @@ async function callApi(action, payload = {}) {
 function renderLoggedOut() {
   if (els.authSection) els.authSection.style.display = 'block';
   if (els.memberSection) els.memberSection.style.display = 'none';
-  if (els.adminSection) els.adminSection.style.display = 'none';
   if (els.logoutBtn) els.logoutBtn.style.display = 'none';
   if (els.loginBtn) els.loginBtn.style.display = 'inline-flex';
-
-  if (els.memberName) els.memberName.textContent = '-';
-  if (els.memberPoints) els.memberPoints.textContent = '0';
-  if (els.memberAvatar) els.memberAvatar.src = '';
-  if (els.rewardsList) els.rewardsList.innerHTML = '<div class="empty-state">登入後可查看可兌換商品</div>';
-  if (els.redemptionList) els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
-  if (els.adminSearchResults) els.adminSearchResults.innerHTML = '';
-  if (els.nicknameInput) els.nicknameInput.value = '';
 }
 
-function renderRewards(rewards = []) {
-  if (!els.rewardsList) return;
+function renderMember(data) {
+  const member = data.member || {};
+  if (els.authSection) els.authSection.style.display = 'none';
+  if (els.memberSection) els.memberSection.style.display = 'block';
+  if (els.logoutBtn) els.logoutBtn.style.display = 'inline-flex';
+  if (els.loginBtn) els.loginBtn.style.display = 'none';
 
-  const topRewards = rewards.slice(0, 3);
+  if (els.memberName) els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
+  if (els.memberPoints) els.memberPoints.textContent = String(data.points ?? 0);
 
-  if (!topRewards.length) {
-    els.rewardsList.innerHTML = `<div class="empty-state">目前沒有可兌換商品</div>`;
+  if (els.memberAvatar) {
+    els.memberAvatar.src =
+      member.avatar_url ||
+      member.picture_url ||
+      'https://placehold.co/96x96?text=User';
+  }
+}
+
+function renderCategoryTabs() {
+  if (!els.categoryTabs) return;
+  els.categoryTabs.querySelectorAll('.category-tab').forEach((btn) => {
+    const isActive = btn.dataset.category === state.selectedCategory;
+    btn.classList.toggle('active', isActive);
+  });
+}
+
+function renderShopRewards() {
+  if (!els.shopRewardsList) return;
+
+  const list = state.selectedCategory === '全部'
+    ? state.allRewards
+    : state.allRewards.filter(item => (item.category || '未分類') === state.selectedCategory);
+
+  if (els.shopSectionTitle) {
+    els.shopSectionTitle.textContent = state.selectedCategory === '全部'
+      ? '全部商品'
+      : `${state.selectedCategory}商品`;
+  }
+
+  if (!list.length) {
+    els.shopRewardsList.innerHTML = `<div class="empty-state">目前這個分類沒有商品</div>`;
     return;
   }
 
-  els.rewardsList.innerHTML = topRewards.map((reward) => {
-    const disabled = Number(reward.stock ?? 0) <= 0 ? 'disabled' : '';
+  const loggedIn = !!state.dashboard?.member?.id;
+
+  els.shopRewardsList.innerHTML = list.map((reward) => {
+    const stockEmpty = Number(reward.stock ?? 0) <= 0;
+    const disabled = !loggedIn || stockEmpty ? 'disabled' : '';
     const imageUrl = reward.image_url || 'https://placehold.co/600x400?text=Reward';
 
     return `
@@ -187,15 +190,15 @@ function renderRewards(rewards = []) {
             <span>${escapeHtml(reward.points_cost)} 點</span>
             <span>庫存 ${escapeHtml(reward.stock)}</span>
           </div>
-          <button class="btn btn-primary redeem-btn" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
-            ${Number(reward.stock ?? 0) > 0 ? '兌換' : '已無庫存'}
+          <button class="btn btn-primary shop-redeem-btn" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
+            ${!loggedIn ? '登入後兌換' : (stockEmpty ? '已無庫存' : '兌換')}
           </button>
         </div>
       </div>
     `;
   }).join('');
 
-  els.rewardsList.querySelectorAll('.redeem-btn').forEach((btn) => {
+  els.shopRewardsList.querySelectorAll('.shop-redeem-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const rewardId = btn.getAttribute('data-reward-id');
       await redeemReward(rewardId);
@@ -203,150 +206,13 @@ function renderRewards(rewards = []) {
   });
 }
 
-function renderRedemptions(redemptions = []) {
-  if (!els.redemptionList) return;
-
-  if (!redemptions.length) {
-    els.redemptionList.innerHTML = `<div class="empty-state">登入後可查看兌換紀錄</div>`;
-    return;
-  }
-
-  els.redemptionList.innerHTML = redemptions.map((item) => `
-    <div class="list-item">
-      <div>
-        <div class="list-title">${escapeHtml(item.reward_name)}</div>
-        <div class="list-subtitle">${escapeHtml(item.status)} ・ ${new Date(item.created_at).toLocaleString()}</div>
-      </div>
-      <div class="list-points">-${escapeHtml(item.points_spent)} 點</div>
-    </div>
-  `).join('');
-}
-
-function renderLeaderboard(leaderboard = []) {
-  if (!els.leaderboardList) return;
-
-  if (!leaderboard.length) {
-    els.leaderboardList.innerHTML = `<div class="empty-state">目前還沒有排行榜資料</div>`;
-    return;
-  }
-
-  els.leaderboardList.innerHTML = leaderboard.map((item, index) => `
-    <div class="list-item">
-      <div class="leaderboard-user">
-        <span class="leaderboard-rank">#${index + 1}</span>
-        <img class="leaderboard-avatar" src="${escapeHtml(item.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(item.display_name)}">
-        <div>
-          <div class="list-title">${escapeHtml(item.display_name)}</div>
-        </div>
-      </div>
-      <div class="list-points">${escapeHtml(item.points)} 點</div>
-    </div>
-  `).join('');
-}
-
-function renderAdminSearchResults(members = []) {
-  if (!els.adminSearchResults) return;
-
-  if (!members.length) {
-    els.adminSearchResults.innerHTML = `<div class="empty-state">找不到符合條件的會員</div>`;
-    return;
-  }
-
-  els.adminSearchResults.innerHTML = members.map((member) => `
-    <div class="list-item">
-      <div class="leaderboard-user">
-        <img class="leaderboard-avatar" src="${escapeHtml(member.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(member.nickname || member.display_name)}">
-        <div>
-          <div class="list-title">${escapeHtml(member.nickname || member.display_name)}</div>
-          <div class="list-subtitle">${escapeHtml(member.id)}</div>
-        </div>
-      </div>
-      <button class="btn btn-secondary select-member-btn" data-member-id="${escapeHtml(member.id)}">
-        選取
-      </button>
-    </div>
-  `).join('');
-
-  els.adminSearchResults.querySelectorAll('.select-member-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const memberId = btn.getAttribute('data-member-id');
-      if (els.grantPointsMemberId) els.grantPointsMemberId.value = memberId || '';
-      if (els.deductPointsMemberId) els.deductPointsMemberId.value = memberId || '';
-      showMessage('已帶入會員 ID');
-    });
-  });
-}
-
-function renderDashboard(data) {
-  state.dashboard = data;
-
-  if (els.authSection) els.authSection.style.display = 'none';
-  if (els.memberSection) els.memberSection.style.display = 'block';
-  if (els.logoutBtn) els.logoutBtn.style.display = 'inline-flex';
-  if (els.loginBtn) els.loginBtn.style.display = 'none';
-
-  const member = data.member || {};
-  if (els.memberName) els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
-  if (els.memberPoints) els.memberPoints.textContent = String(data.points ?? 0);
-
-  if (els.memberAvatar) {
-    els.memberAvatar.src =
-      member.avatar_url ||
-      member.picture_url ||
-      'https://placehold.co/96x96?text=User';
-    els.memberAvatar.alt = member.nickname || member.display_name || '會員頭像';
-  }
-
-  if (els.nicknameInput) {
-    els.nicknameInput.value = member.nickname || member.display_name || '';
-  }
-
-  renderRewards(data.rewards || []);
-  renderRedemptions(data.redemptions || []);
-  renderLeaderboard(data.leaderboard || []);
-
-  if (data.member?.is_admin) {
-    if (els.adminSection) els.adminSection.style.display = 'block';
-  } else {
-    if (els.adminSection) els.adminSection.style.display = 'none';
-  }
-}
-
-async function loadPublicLeaderboard() {
-  try {
-    const data = await callApi('get_public_leaderboard');
-    renderLeaderboard(data.leaderboard || []);
-  } catch (error) {
-    console.error('loadPublicLeaderboard error =', error);
-    renderLeaderboard([]);
-  }
-}
-
-async function bootstrapDashboard() {
-  const data = await callApi('login');
-  renderDashboard(data);
-}
-
-async function saveNickname() {
-  try {
-    clearMessage();
-
-    const nickname = els.nicknameInput?.value?.trim();
-    if (!nickname) throw new Error('請輸入暱稱');
-
-    const result = await callApi('update_nickname', { nickname });
-    showMessage(result.message || '暱稱更新成功');
-    renderDashboard(result);
-  } catch (error) {
-    console.error('saveNickname error =', error);
-    showMessage(normalizeError(error, '暱稱更新失敗'), true);
-  }
-}
-
 async function redeemReward(rewardId) {
   try {
     clearMessage();
-    if (!state.dashboard?.member?.id) throw new Error('尚未取得會員資料');
+
+    if (!state.dashboard?.member?.id) {
+      throw new Error('請先登入後再兌換');
+    }
 
     await callApi('redeem', {
       memberId: state.dashboard.member.id,
@@ -361,88 +227,24 @@ async function redeemReward(rewardId) {
   }
 }
 
-async function searchMembers() {
+async function loadPublicLeaderboardAndRewards() {
   try {
-    clearMessage();
-    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
-
-    const keyword = els.adminSearchInput?.value?.trim() || '';
-    const data = await callApi('search_members', {
-      keyword,
-      adminLineUserId: state.profile.userId,
-    });
-
-    renderAdminSearchResults(data.members || []);
+    const data = await callApi('get_public_leaderboard');
+    state.allRewards = data.rewards || [];
+    renderShopRewards();
   } catch (error) {
-    console.error('searchMembers error =', error);
-    showMessage(normalizeError(error, '搜尋會員失敗'), true);
+    console.error('loadPublicLeaderboardAndRewards error =', error);
+    state.allRewards = [];
+    renderShopRewards();
   }
 }
 
-async function grantPoints() {
-  try {
-    clearMessage();
-
-    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
-
-    const memberId = els.grantPointsMemberId?.value?.trim();
-    const points = Number(els.grantPointsValue?.value || 0);
-    const reason = els.grantPointsReason?.value?.trim();
-
-    if (!memberId) throw new Error('請先填入會員 ID');
-    if (!points || points <= 0) throw new Error('請填入大於 0 的點數');
-    if (!reason) throw new Error('請填入加點原因');
-
-    const result = await callApi('grant_points', {
-      memberId,
-      points,
-      reason,
-      adminLineUserId: state.profile.userId,
-    });
-
-    showMessage(result.message || '加點成功');
-
-    if (els.grantPointsValue) els.grantPointsValue.value = '';
-    if (els.grantPointsReason) els.grantPointsReason.value = '';
-
-    await bootstrapDashboard();
-  } catch (error) {
-    console.error('grantPoints error =', error);
-    showMessage(normalizeError(error, '加點失敗'), true);
-  }
-}
-
-async function deductPoints() {
-  try {
-    clearMessage();
-
-    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
-
-    const memberId = els.deductPointsMemberId?.value?.trim();
-    const points = Number(els.deductPointsValue?.value || 0);
-    const reason = els.deductPointsReason?.value?.trim();
-
-    if (!memberId) throw new Error('請先填入會員 ID');
-    if (!points || points <= 0) throw new Error('請填入大於 0 的扣點數');
-    if (!reason) throw new Error('請填入扣點原因');
-
-    const result = await callApi('deduct_points', {
-      memberId,
-      points,
-      reason,
-      adminLineUserId: state.profile.userId,
-    });
-
-    showMessage(result.message || '扣點成功');
-
-    if (els.deductPointsValue) els.deductPointsValue.value = '';
-    if (els.deductPointsReason) els.deductPointsReason.value = '';
-
-    await bootstrapDashboard();
-  } catch (error) {
-    console.error('deductPoints error =', error);
-    showMessage(normalizeError(error, '扣點失敗'), true);
-  }
+async function bootstrapDashboard() {
+  const data = await callApi('login');
+  state.dashboard = data;
+  state.allRewards = data.rewards || [];
+  renderMember(data);
+  renderShopRewards();
 }
 
 async function signIn() {
@@ -475,7 +277,7 @@ async function signOut() {
     state.dashboard = null;
 
     renderLoggedOut();
-    await loadPublicLeaderboard();
+    renderShopRewards();
     showMessage('已登出');
   } catch (error) {
     console.error('signOut error =', error);
@@ -504,7 +306,6 @@ async function bootstrap() {
 
     if (!liff.isLoggedIn()) {
       renderLoggedOut();
-      await loadPublicLeaderboard();
       return;
     }
 
@@ -516,7 +317,6 @@ async function bootstrap() {
   } catch (error) {
     console.error('bootstrap error =', error);
     renderLoggedOut();
-    await loadPublicLeaderboard();
     showMessage(`初始化失敗：${normalizeError(error)}`, true);
   } finally {
     if (els.appReady) els.appReady.style.display = 'block';
@@ -526,15 +326,21 @@ async function bootstrap() {
 function bindEvents() {
   if (els.loginBtn) els.loginBtn.addEventListener('click', signIn);
   if (els.logoutBtn) els.logoutBtn.addEventListener('click', signOut);
-  if (els.nicknameSaveBtn) els.nicknameSaveBtn.addEventListener('click', saveNickname);
-  if (els.adminSearchBtn) els.adminSearchBtn.addEventListener('click', searchMembers);
-  if (els.grantPointsBtn) els.grantPointsBtn.addEventListener('click', grantPoints);
-  if (els.deductPointsBtn) els.deductPointsBtn.addEventListener('click', deductPoints);
+
+  if (els.categoryTabs) {
+    els.categoryTabs.querySelectorAll('.category-tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.selectedCategory = btn.dataset.category || '全部';
+        renderCategoryTabs();
+        renderShopRewards();
+      });
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
   bindEvents();
-  renderLoggedOut();
-  await loadPublicLeaderboard();
+  renderCategoryTabs();
+  await loadPublicLeaderboardAndRewards();
   await bootstrap();
 });
