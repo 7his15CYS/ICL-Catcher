@@ -10,7 +10,7 @@ body {
 }
 
 .page {
-  max-width: 980px;
+  max-width: 1180px;
   margin: 0 auto;
   padding: 24px;
 }
@@ -22,6 +22,7 @@ body {
   border-radius: 24px;
   padding: 28px;
   margin-bottom: 20px;
+  box-shadow: 0 8px 24px rgba(22, 50, 79, 0.04);
 }
 
 .hero-card {
@@ -67,12 +68,25 @@ h3 {
   border-radius: 14px;
   padding: 14px 22px;
   font-size: 16px;
+  font-weight: 700;
   cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-primary {
   background: #10c650;
   color: #fff;
+  box-shadow: 0 8px 18px rgba(16, 198, 80, 0.18);
 }
 
 .btn-secondary {
@@ -118,6 +132,7 @@ h3 {
   border-radius: 999px;
   object-fit: cover;
   background: #f3f6fa;
+  border: 3px solid #eef5ff;
 }
 
 .member-info {
@@ -180,6 +195,10 @@ h3 {
   white-space: nowrap;
 }
 
+.more-link:hover {
+  text-decoration: underline;
+}
+
 .category-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -195,66 +214,104 @@ h3 {
   cursor: pointer;
   font-size: 15px;
   font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.category-tab:hover {
+  border-color: #10c650;
+  color: #10a848;
 }
 
 .category-tab.active {
   background: #10c650;
   color: #fff;
   border-color: #10c650;
+  box-shadow: 0 8px 18px rgba(16, 198, 80, 0.18);
 }
 
+/* 商品格線：首頁 3 欄、商店頁會自動縮放 */
 .reward-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 22px;
 }
 
+/* 商品卡片重新設計 */
 .reward-card {
   border: 1px solid #d8e1ec;
-  border-radius: 18px;
+  border-radius: 22px;
   overflow: hidden;
   background: #fff;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
 }
 
+.reward-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(22, 50, 79, 0.08);
+  border-color: #c6d7ea;
+}
+
+/* 這裡是重點：圖片不再裁切 */
 .reward-image {
   width: 100%;
-  height: 180px;
-  object-fit: cover;
+  height: 240px;
+  object-fit: contain;
+  object-position: center;
   display: block;
+  background: linear-gradient(180deg, #f8fbff 0%, #f1f6fb 100%);
+  padding: 14px;
 }
 
+/* 商品內容 */
 .reward-body {
-  padding: 16px;
-}
-
-.reward-body h3 {
-  margin: 0 0 10px;
-  font-size: 20px;
-}
-
-.reward-body p {
-  margin: 0 0 14px;
-  color: #5f7690;
-  line-height: 1.6;
-}
-
-.reward-meta {
+  padding: 18px;
   display: flex;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  font-size: 14px;
-  color: #4a627c;
+  flex-direction: column;
+  flex: 1;
 }
 
 .reward-category {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
   margin-bottom: 12px;
-  padding: 4px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
   background: #eef5ff;
   color: #285ea8;
   font-size: 13px;
   font-weight: 700;
+}
+
+.reward-body h3 {
+  margin: 0 0 10px;
+  font-size: 20px;
+  line-height: 1.35;
+}
+
+.reward-body p {
+  margin: 0 0 16px;
+  color: #5f7690;
+  line-height: 1.65;
+  min-height: 52px;
+}
+
+.reward-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  margin-bottom: 16px;
+  font-size: 15px;
+  color: #4a627c;
+}
+
+.reward-meta span:first-child {
+  font-weight: 800;
+  color: #16324f;
 }
 
 .list-wrap {
@@ -358,6 +415,20 @@ h3 {
   background: #fbfdff;
 }
 
+@media (max-width: 1024px) {
+  .page {
+    max-width: 1000px;
+  }
+
+  .reward-grid {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+
+  .reward-image {
+    height: 220px;
+  }
+}
+
 @media (max-width: 768px) {
   .page {
     padding: 14px;
@@ -387,5 +458,61 @@ h3 {
 
   .member-actions {
     margin-left: 0;
+  }
+
+  .reward-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .reward-card {
+    border-radius: 20px;
+  }
+
+  .reward-image {
+    height: 220px;
+    padding: 12px;
+  }
+
+  .reward-body {
+    padding: 16px;
+  }
+
+  .reward-body h3 {
+    font-size: 18px;
+  }
+
+  .reward-body p {
+    min-height: auto;
+  }
+
+  .reward-meta {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .hero-card,
+  .card {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  h1 {
+    font-size: 32px;
+  }
+
+  h2 {
+    font-size: 24px;
+  }
+
+  .reward-image {
+    height: 200px;
+  }
+
+  .btn {
+    width: fit-content;
+    min-width: 96px;
+    justify-content: center;
   }
 }
