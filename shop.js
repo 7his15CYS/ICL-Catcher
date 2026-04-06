@@ -146,11 +146,43 @@ function renderMember(data) {
   }
 }
 
+function getCategoriesFromRewards(rewards = []) {
+  const categories = Array.from(
+    new Set(
+      rewards
+        .map(item => String(item.category || '').trim())
+        .filter(Boolean)
+    )
+  );
+
+  return ['全部', ...categories];
+}
+
 function renderCategoryTabs() {
   if (!els.categoryTabs) return;
+
+  const categories = getCategoriesFromRewards(state.allRewards);
+
+  if (!categories.includes(state.selectedCategory)) {
+    state.selectedCategory = '全部';
+  }
+
+  els.categoryTabs.innerHTML = categories.map(category => `
+    <button
+      class="category-tab ${category === state.selectedCategory ? 'active' : ''}"
+      data-category="${escapeHtml(category)}"
+      type="button"
+    >
+      ${escapeHtml(category)}
+    </button>
+  `).join('');
+
   els.categoryTabs.querySelectorAll('.category-tab').forEach((btn) => {
-    const isActive = btn.dataset.category === state.selectedCategory;
-    btn.classList.toggle('active', isActive);
+    btn.addEventListener('click', () => {
+      state.selectedCategory = btn.dataset.category || '全部';
+      renderCategoryTabs();
+      renderShopRewards();
+    });
   });
 }
 
@@ -159,7 +191,7 @@ function renderShopRewards() {
 
   const list = state.selectedCategory === '全部'
     ? state.allRewards
-    : state.allRewards.filter(item => (item.category || '未分類') === state.selectedCategory);
+    : state.allRewards.filter(item => String(item.category || '未分類') === state.selectedCategory);
 
   if (els.shopSectionTitle) {
     els.shopSectionTitle.textContent = state.selectedCategory === '全部'
@@ -231,10 +263,12 @@ async function loadPublicLeaderboardAndRewards() {
   try {
     const data = await callApi('get_public_leaderboard');
     state.allRewards = data.rewards || [];
+    renderCategoryTabs();
     renderShopRewards();
   } catch (error) {
     console.error('loadPublicLeaderboardAndRewards error =', error);
     state.allRewards = [];
+    renderCategoryTabs();
     renderShopRewards();
   }
 }
@@ -244,6 +278,7 @@ async function bootstrapDashboard() {
   state.dashboard = data;
   state.allRewards = data.rewards || [];
   renderMember(data);
+  renderCategoryTabs();
   renderShopRewards();
 }
 
@@ -326,21 +361,10 @@ async function bootstrap() {
 function bindEvents() {
   if (els.loginBtn) els.loginBtn.addEventListener('click', signIn);
   if (els.logoutBtn) els.logoutBtn.addEventListener('click', signOut);
-
-  if (els.categoryTabs) {
-    els.categoryTabs.querySelectorAll('.category-tab').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.selectedCategory = btn.dataset.category || '全部';
-        renderCategoryTabs();
-        renderShopRewards();
-      });
-    });
-  }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
   bindEvents();
-  renderCategoryTabs();
   await loadPublicLeaderboardAndRewards();
   await bootstrap();
 });
