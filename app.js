@@ -44,21 +44,15 @@ const state = {
 function normalizeError(err, fallback = '發生錯誤') {
   if (err == null) return fallback;
 
-  if (typeof err === 'string') {
-    return err === '[object Object]' ? fallback : err;
-  }
+  if (typeof err === 'string') return err === '[object Object]' ? fallback : err;
 
   if (err instanceof Error) {
-    return err.message && err.message !== '[object Object]'
-      ? err.message
-      : fallback;
+    return err.message && err.message !== '[object Object]' ? err.message : fallback;
   }
 
   if (typeof err === 'object') {
     if (err.debug && typeof err.debug === 'object') {
-      if (typeof err.debug.message === 'string' && err.debug.message !== '[object Object]') {
-        return err.debug.message;
-      }
+      if (typeof err.debug.message === 'string' && err.debug.message !== '[object Object]') return err.debug.message;
       if (typeof err.debug.error_description === 'string') return err.debug.error_description;
       if (typeof err.debug.error === 'string') return err.debug.error;
       try {
@@ -162,8 +156,8 @@ function renderLoggedOut() {
   if (els.memberName) els.memberName.textContent = '-';
   if (els.memberPoints) els.memberPoints.textContent = '0';
   if (els.memberAvatar) els.memberAvatar.src = '';
-  if (els.rewardsList) els.rewardsList.innerHTML = '';
-  if (els.redemptionList) els.redemptionList.innerHTML = '';
+  if (els.rewardsList) els.rewardsList.innerHTML = '<div class="empty-state">登入後可查看可兌換商品</div>';
+  if (els.redemptionList) els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
   if (els.adminSearchResults) els.adminSearchResults.innerHTML = '';
   if (els.nicknameInput) els.nicknameInput.value = '';
 }
@@ -171,12 +165,14 @@ function renderLoggedOut() {
 function renderRewards(rewards = []) {
   if (!els.rewardsList) return;
 
-  if (!rewards.length) {
-    els.rewardsList.innerHTML = `<div class="empty-state">登入後可查看可兌換商品</div>`;
+  const topRewards = rewards.slice(0, 3);
+
+  if (!topRewards.length) {
+    els.rewardsList.innerHTML = `<div class="empty-state">目前沒有可兌換商品</div>`;
     return;
   }
 
-  els.rewardsList.innerHTML = rewards.map((reward) => {
+  els.rewardsList.innerHTML = topRewards.map((reward) => {
     const disabled = Number(reward.stock ?? 0) <= 0 ? 'disabled' : '';
     const imageUrl = reward.image_url || 'https://placehold.co/600x400?text=Reward';
 
@@ -184,6 +180,7 @@ function renderRewards(rewards = []) {
       <div class="reward-card">
         <img class="reward-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(reward.name)}">
         <div class="reward-body">
+          <span class="reward-category">${escapeHtml(reward.category || '未分類')}</span>
           <h3>${escapeHtml(reward.name)}</h3>
           <p>${escapeHtml(reward.description || '')}</p>
           <div class="reward-meta">
