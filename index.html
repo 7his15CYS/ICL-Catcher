@@ -43,6 +43,26 @@
           <button class="btn btn-secondary" id="logout-btn" style="display:none;">登出</button>
         </div>
       </div>
+
+      <div class="nickname-card">
+        <div class="nickname-title-row">
+          <h3>排行榜顯示名稱</h3>
+          <p class="nickname-help">你可以自行設定暱稱。排行榜只顯示暱稱，不顯示 LINE 真名。</p>
+        </div>
+
+        <div class="nickname-form">
+          <input
+            type="text"
+            id="nickname-input"
+            class="input"
+            maxlength="20"
+            placeholder="請輸入你的暱稱"
+          />
+          <button class="btn btn-primary" id="nickname-save-btn">更新暱稱</button>
+        </div>
+
+        <p class="nickname-tip">限制：2~20 字，不能和別人重複，可用中文、英文、數字、空格、底線、連字號。</p>
+      </div>
     </section>
 
     <section class="card">
@@ -70,7 +90,7 @@
             type="text"
             id="admin-search-input"
             class="input"
-            placeholder="輸入會員名稱"
+            placeholder="輸入會員名稱或暱稱"
           />
           <button class="btn btn-secondary" id="admin-search-btn">搜尋</button>
         </div>
