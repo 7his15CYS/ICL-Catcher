@@ -50,11 +50,14 @@ h2 {
 }
 
 h3 {
-  margin-top: 0;
+  margin: 0;
+  font-size: 20px;
 }
 
 .hero-text,
-.muted {
+.muted,
+.nickname-help,
+.nickname-tip {
   color: #5f7690;
   line-height: 1.7;
 }
@@ -82,6 +85,8 @@ h3 {
   padding: 16px 18px;
   border-radius: 16px;
   font-size: 15px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .message.error {
@@ -110,8 +115,16 @@ h3 {
   background: #f3f6fa;
 }
 
+.member-info {
+  flex: 1;
+}
+
 .member-info h2 {
   margin-bottom: 6px;
+}
+
+.member-actions {
+  margin-left: auto;
 }
 
 .points-label {
@@ -123,6 +136,28 @@ h3 {
   font-size: 32px;
   font-weight: 800;
   color: #10a848;
+}
+
+.nickname-card {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #e3ebf3;
+}
+
+.nickname-title-row {
+  margin-bottom: 14px;
+}
+
+.nickname-help,
+.nickname-tip {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+
+.nickname-form {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .reward-grid {
@@ -244,11 +279,6 @@ h3 {
   margin-top: 24px;
 }
 
-.guide-list {
-  margin: 0 0 16px 24px;
-  line-height: 1.8;
-}
-
 .empty-state {
   padding: 18px;
   border: 1px dashed #ccd7e3;
@@ -272,7 +302,8 @@ h3 {
   }
 
   .form-grid,
-  .row {
+  .row,
+  .nickname-form {
     grid-template-columns: 1fr;
     display: grid;
   }
@@ -281,18 +312,8 @@ h3 {
     flex-direction: column;
     align-items: flex-start;
   }
-}
 
-.member-header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-}
-
-.member-info {
-  flex: 1;
-}
-
-.member-actions {
-  margin-left: auto;
+  .member-actions {
+    margin-left: 0;
+  }
 }
