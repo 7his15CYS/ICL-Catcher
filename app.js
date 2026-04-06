@@ -12,6 +12,9 @@ const els = {
   memberAvatar: document.getElementById('member-avatar'),
   memberPoints: document.getElementById('member-points'),
 
+  nicknameInput: document.getElementById('nickname-input'),
+  nicknameSaveBtn: document.getElementById('nickname-save-btn'),
+
   rewardsList: document.getElementById('rewards-list'),
   redemptionList: document.getElementById('redemption-list'),
   leaderboardList: document.getElementById('leaderboard-list'),
@@ -51,20 +54,14 @@ function normalizeError(err, fallback = '發生錯誤') {
       if (typeof err.debug.message === 'string' && err.debug.message !== '[object Object]') {
         return err.debug.message;
       }
-      if (typeof err.debug.error_description === 'string') {
-        return err.debug.error_description;
-      }
-      if (typeof err.debug.error === 'string') {
-        return err.debug.error;
-      }
+      if (typeof err.debug.error_description === 'string') return err.debug.error_description;
+      if (typeof err.debug.error === 'string') return err.debug.error;
       try {
         return JSON.stringify(err.debug, null, 2);
       } catch {}
     }
 
-    if (typeof err.message === 'string' && err.message !== '[object Object]') {
-      return err.message;
-    }
+    if (typeof err.message === 'string' && err.message !== '[object Object]') return err.message;
     if (typeof err.error_description === 'string') return err.error_description;
     if (typeof err.error === 'string') return err.error;
 
@@ -164,6 +161,7 @@ function renderLoggedOut() {
   if (els.redemptionList) els.redemptionList.innerHTML = '';
   if (els.leaderboardList) els.leaderboardList.innerHTML = '';
   if (els.adminSearchResults) els.adminSearchResults.innerHTML = '';
+  if (els.nicknameInput) els.nicknameInput.value = '';
 }
 
 function renderRewards(rewards = []) {
@@ -256,9 +254,9 @@ function renderAdminSearchResults(members = []) {
   els.adminSearchResults.innerHTML = members.map((member) => `
     <div class="list-item">
       <div class="leaderboard-user">
-        <img class="leaderboard-avatar" src="${escapeHtml(member.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(member.display_name)}">
+        <img class="leaderboard-avatar" src="${escapeHtml(member.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(member.nickname || member.display_name)}">
         <div>
-          <div class="list-title">${escapeHtml(member.display_name)}</div>
+          <div class="list-title">${escapeHtml(member.nickname || member.display_name)}</div>
           <div class="list-subtitle">${escapeHtml(member.id)}</div>
         </div>
       </div>
@@ -286,7 +284,7 @@ function renderDashboard(data) {
   if (els.loginBtn) els.loginBtn.style.display = 'none';
 
   const member = data.member || {};
-  if (els.memberName) els.memberName.textContent = member.display_name || 'LINE 會員';
+  if (els.memberName) els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
   if (els.memberPoints) els.memberPoints.textContent = String(data.points ?? 0);
 
   if (els.memberAvatar) {
@@ -294,7 +292,11 @@ function renderDashboard(data) {
       member.avatar_url ||
       member.picture_url ||
       'https://placehold.co/96x96?text=User';
-    els.memberAvatar.alt = member.display_name || '會員頭像';
+    els.memberAvatar.alt = member.nickname || member.display_name || '會員頭像';
+  }
+
+  if (els.nicknameInput) {
+    els.nicknameInput.value = member.nickname || member.display_name || '';
   }
 
   renderRewards(data.rewards || []);
@@ -311,6 +313,22 @@ function renderDashboard(data) {
 async function bootstrapDashboard() {
   const data = await callApi('login');
   renderDashboard(data);
+}
+
+async function saveNickname() {
+  try {
+    clearMessage();
+
+    const nickname = els.nicknameInput?.value?.trim();
+    if (!nickname) throw new Error('請輸入暱稱');
+
+    const result = await callApi('update_nickname', { nickname });
+    showMessage(result.message || '暱稱更新成功');
+    renderDashboard(result);
+  } catch (error) {
+    console.error('saveNickname error =', error);
+    showMessage(normalizeError(error, '暱稱更新失敗'), true);
+  }
 }
 
 async function redeemReward(rewardId) {
@@ -446,9 +464,7 @@ async function bootstrap() {
     }
 
     state.accessToken = liff.getAccessToken();
-    if (!state.accessToken) {
-      throw new Error('無法取得 LINE access token');
-    }
+    if (!state.accessToken) throw new Error('無法取得 LINE access token');
 
     state.profile = await liff.getProfile();
     await bootstrapDashboard();
@@ -464,6 +480,7 @@ async function bootstrap() {
 function bindEvents() {
   if (els.loginBtn) els.loginBtn.addEventListener('click', signIn);
   if (els.logoutBtn) els.logoutBtn.addEventListener('click', signOut);
+  if (els.nicknameSaveBtn) els.nicknameSaveBtn.addEventListener('click', saveNickname);
   if (els.adminSearchBtn) els.adminSearchBtn.addEventListener('click', searchMembers);
   if (els.grantPointsBtn) els.grantPointsBtn.addEventListener('click', grantPoints);
 }
