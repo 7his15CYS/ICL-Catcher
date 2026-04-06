@@ -164,7 +164,6 @@ function renderLoggedOut() {
   if (els.memberAvatar) els.memberAvatar.src = '';
   if (els.rewardsList) els.rewardsList.innerHTML = '';
   if (els.redemptionList) els.redemptionList.innerHTML = '';
-  if (els.leaderboardList) els.leaderboardList.innerHTML = '';
   if (els.adminSearchResults) els.adminSearchResults.innerHTML = '';
   if (els.nicknameInput) els.nicknameInput.value = '';
 }
@@ -173,7 +172,7 @@ function renderRewards(rewards = []) {
   if (!els.rewardsList) return;
 
   if (!rewards.length) {
-    els.rewardsList.innerHTML = `<div class="empty-state">目前沒有可兌換商品</div>`;
+    els.rewardsList.innerHTML = `<div class="empty-state">登入後可查看可兌換商品</div>`;
     return;
   }
 
@@ -211,7 +210,7 @@ function renderRedemptions(redemptions = []) {
   if (!els.redemptionList) return;
 
   if (!redemptions.length) {
-    els.redemptionList.innerHTML = `<div class="empty-state">目前還沒有兌換紀錄</div>`;
+    els.redemptionList.innerHTML = `<div class="empty-state">登入後可查看兌換紀錄</div>`;
     return;
   }
 
@@ -313,6 +312,16 @@ function renderDashboard(data) {
     if (els.adminSection) els.adminSection.style.display = 'block';
   } else {
     if (els.adminSection) els.adminSection.style.display = 'none';
+  }
+}
+
+async function loadPublicLeaderboard() {
+  try {
+    const data = await callApi('get_public_leaderboard');
+    renderLeaderboard(data.leaderboard || []);
+  } catch (error) {
+    console.error('loadPublicLeaderboard error =', error);
+    renderLeaderboard([]);
   }
 }
 
@@ -469,6 +478,7 @@ async function signOut() {
     state.dashboard = null;
 
     renderLoggedOut();
+    await loadPublicLeaderboard();
     showMessage('已登出');
   } catch (error) {
     console.error('signOut error =', error);
@@ -497,6 +507,7 @@ async function bootstrap() {
 
     if (!liff.isLoggedIn()) {
       renderLoggedOut();
+      await loadPublicLeaderboard();
       return;
     }
 
@@ -508,6 +519,7 @@ async function bootstrap() {
   } catch (error) {
     console.error('bootstrap error =', error);
     renderLoggedOut();
+    await loadPublicLeaderboard();
     showMessage(`初始化失敗：${normalizeError(error)}`, true);
   } finally {
     if (els.appReady) els.appReady.style.display = 'block';
@@ -526,5 +538,6 @@ function bindEvents() {
 document.addEventListener('DOMContentLoaded', async () => {
   bindEvents();
   renderLoggedOut();
+  await loadPublicLeaderboard();
   await bootstrap();
 });
