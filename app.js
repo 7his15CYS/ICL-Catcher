@@ -28,6 +28,11 @@ const els = {
   grantPointsValue: document.getElementById('grant-points-value'),
   grantPointsReason: document.getElementById('grant-points-reason'),
   grantPointsBtn: document.getElementById('grant-points-btn'),
+
+  deductPointsMemberId: document.getElementById('deduct-points-member-id'),
+  deductPointsValue: document.getElementById('deduct-points-value'),
+  deductPointsReason: document.getElementById('deduct-points-reason'),
+  deductPointsBtn: document.getElementById('deduct-points-btn'),
 };
 
 const state = {
@@ -270,6 +275,7 @@ function renderAdminSearchResults(members = []) {
     btn.addEventListener('click', () => {
       const memberId = btn.getAttribute('data-member-id');
       if (els.grantPointsMemberId) els.grantPointsMemberId.value = memberId || '';
+      if (els.deductPointsMemberId) els.deductPointsMemberId.value = memberId || '';
       showMessage('已帶入會員 ID');
     });
   });
@@ -371,9 +377,7 @@ async function grantPoints() {
   try {
     clearMessage();
 
-    if (!state.profile?.userId) {
-      throw new Error('尚未取得 LINE 使用者資訊');
-    }
+    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
 
     const memberId = els.grantPointsMemberId?.value?.trim();
     const points = Number(els.grantPointsValue?.value || 0);
@@ -399,6 +403,39 @@ async function grantPoints() {
   } catch (error) {
     console.error('grantPoints error =', error);
     showMessage(normalizeError(error, '加點失敗'), true);
+  }
+}
+
+async function deductPoints() {
+  try {
+    clearMessage();
+
+    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
+
+    const memberId = els.deductPointsMemberId?.value?.trim();
+    const points = Number(els.deductPointsValue?.value || 0);
+    const reason = els.deductPointsReason?.value?.trim();
+
+    if (!memberId) throw new Error('請先填入會員 ID');
+    if (!points || points <= 0) throw new Error('請填入大於 0 的扣點數');
+    if (!reason) throw new Error('請填入扣點原因');
+
+    const result = await callApi('deduct_points', {
+      memberId,
+      points,
+      reason,
+      adminLineUserId: state.profile.userId,
+    });
+
+    showMessage(result.message || '扣點成功');
+
+    if (els.deductPointsValue) els.deductPointsValue.value = '';
+    if (els.deductPointsReason) els.deductPointsReason.value = '';
+
+    await bootstrapDashboard();
+  } catch (error) {
+    console.error('deductPoints error =', error);
+    showMessage(normalizeError(error, '扣點失敗'), true);
   }
 }
 
@@ -483,6 +520,7 @@ function bindEvents() {
   if (els.nicknameSaveBtn) els.nicknameSaveBtn.addEventListener('click', saveNickname);
   if (els.adminSearchBtn) els.adminSearchBtn.addEventListener('click', searchMembers);
   if (els.grantPointsBtn) els.grantPointsBtn.addEventListener('click', grantPoints);
+  if (els.deductPointsBtn) els.deductPointsBtn.addEventListener('click', deductPoints);
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
