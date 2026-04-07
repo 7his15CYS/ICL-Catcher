@@ -1,4 +1,4 @@
-const config = window.APP_CONFIG;
+const config = window.APP_CONFIG || {};
 
 const els = {
   appReady: document.getElementById('app-ready'),
@@ -485,14 +485,23 @@ async function bootstrap() {
   clearMessage();
 
   try {
-    if (!config?.liffId) throw new Error('config.js 尚未設定 liffId');
-    if (!config?.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
-    if (!config?.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
-    if (!config?.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
+    const currentConfig = window.APP_CONFIG || {};
+
+    if (!currentConfig.liffId) {
+      // 不要立刻噴錯，等一下再試一次
+      setTimeout(() => {
+        bootstrap();
+      }, 200);
+      return;
+    }
+
+    if (!currentConfig.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
+    if (!currentConfig.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
+    if (!currentConfig.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
 
     await liff.init({
-      liffId: config.liffId,
+      liffId: currentConfig.liffId,
       withLoginOnExternalBrowser: true,
     });
 
