@@ -1,4 +1,6 @@
-const config = window.APP_CONFIG;
+function getConfig() {
+  return window.APP_CONFIG || {};
+}
 
 const els = {
   appReady: document.getElementById('app-ready'),
@@ -23,6 +25,7 @@ const state = {
   dashboard: null,
   allRewards: [],
   selectedCategory: '全部',
+  isBootstrapping: false,
 };
 
 function normalizeError(err, fallback = '發生錯誤') {
@@ -31,11 +34,6 @@ function normalizeError(err, fallback = '發生錯誤') {
   if (err instanceof Error) return err.message && err.message !== '[object Object]' ? err.message : fallback;
 
   if (typeof err === 'object') {
-    if (err.debug && typeof err.debug === 'object') {
-      if (typeof err.debug.message === 'string' && err.debug.message !== '[object Object]') return err.debug.message;
-      if (typeof err.debug.error_description === 'string') return err.debug.error_description;
-      if (typeof err.debug.error === 'string') return err.debug.error;
-    }
     if (typeof err.message === 'string' && err.message !== '[object Object]') return err.message;
     if (typeof err.error_description === 'string') return err.error_description;
     if (typeof err.error === 'string') return err.error;
@@ -52,6 +50,7 @@ function normalizeError(err, fallback = '發生錯誤') {
 
 function showMessage(message, isError = false) {
   if (!els.messageBox) return;
+
   const finalMessage =
     typeof message === 'string'
       ? (message === '[object Object]' ? (isError ? '發生錯誤' : '') : message)
@@ -90,6 +89,12 @@ function hasLiffRedirectParams() {
 }
 
 async function callApi(action, payload = {}) {
+  const config = getConfig();
+
+  if (!config.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
+  if (!config.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
+  if (!config.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
+
   const url = `${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`;
 
   const res = await fetch(url, {
@@ -130,13 +135,19 @@ function renderLoggedOut() {
 
 function renderMember(data) {
   const member = data.member || {};
+
   if (els.authSection) els.authSection.style.display = 'none';
   if (els.memberSection) els.memberSection.style.display = 'block';
   if (els.logoutBtn) els.logoutBtn.style.display = 'inline-flex';
   if (els.loginBtn) els.loginBtn.style.display = 'none';
 
-  if (els.memberName) els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
-  if (els.memberPoints) els.memberPoints.textContent = String(data.points ?? 0);
+  if (els.memberName) {
+    els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
+  }
+
+  if (els.memberPoints) {
+    els.memberPoints.textContent = String(data.points ?? 0);
+  }
 
   if (els.memberAvatar) {
     els.memberAvatar.src =
@@ -150,7 +161,7 @@ function getCategoriesFromRewards(rewards = []) {
   const categories = Array.from(
     new Set(
       rewards
-        .map(item => String(item.category || '').trim())
+        .map((item) => String(item.category || '').trim())
         .filter(Boolean)
     )
   );
@@ -167,15 +178,19 @@ function renderCategoryTabs() {
     state.selectedCategory = '全部';
   }
 
-  els.categoryTabs.innerHTML = categories.map(category => `
-    <button
-      class="category-tab ${category === state.selectedCategory ? 'active' : ''}"
-      data-category="${escapeHtml(category)}"
-      type="button"
-    >
-      ${escapeHtml(category)}
-    </button>
-  `).join('');
+  els.categoryTabs.innerHTML = categories
+    .map(
+      (category) => `
+        <button
+          class="category-tab ${category === state.selectedCategory ? 'active' : ''}"
+          data-category="${escapeHtml(category)}"
+          type="button"
+        >
+          ${escapeHtml(category)}
+        </button>
+      `
+    )
+    .join('');
 
   els.categoryTabs.querySelectorAll('.category-tab').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -189,14 +204,16 @@ function renderCategoryTabs() {
 function renderShopRewards() {
   if (!els.shopRewardsList) return;
 
-  const list = state.selectedCategory === '全部'
-    ? state.allRewards
-    : state.allRewards.filter(item => String(item.category || '未分類') === state.selectedCategory);
+  const list =
+    state.selectedCategory === '全部'
+      ? state.allRewards
+      : state.allRewards.filter(
+          (item) => String(item.category || '未分類') === state.selectedCategory
+        );
 
   if (els.shopSectionTitle) {
-    els.shopSectionTitle.textContent = state.selectedCategory === '全部'
-      ? '全部商品'
-      : `${state.selectedCategory}商品`;
+    els.shopSectionTitle.textContent =
+      state.selectedCategory === '全部' ? '全部商品' : `${state.selectedCategory}商品`;
   }
 
   if (!list.length) {
@@ -206,33 +223,35 @@ function renderShopRewards() {
 
   const loggedIn = !!state.dashboard?.member?.id;
 
-  els.shopRewardsList.innerHTML = list.map((reward) => {
-    const stockEmpty = Number(reward.stock ?? 0) <= 0;
-    const disabled = !loggedIn || stockEmpty ? 'disabled' : '';
-    const imageUrl = reward.image_url || 'https://placehold.co/600x400?text=Reward';
+  els.shopRewardsList.innerHTML = list
+    .map((reward) => {
+      const stockEmpty = Number(reward.stock ?? 0) <= 0;
+      const disabled = !loggedIn || stockEmpty ? 'disabled' : '';
+      const imageUrl = reward.image_url || 'https://placehold.co/600x400?text=Reward';
 
-    return `
-      <div class="reward-card">
-        <img class="reward-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(reward.name)}">
-        <div class="reward-body">
-          <span class="reward-category">${escapeHtml(reward.category || '未分類')}</span>
-          <h3>${escapeHtml(reward.name)}</h3>
-          <p>${escapeHtml(reward.description || '')}</p>
-          <div class="reward-meta">
-            <span>${escapeHtml(reward.points_cost)} 點</span>
-            <span>庫存 ${escapeHtml(reward.stock)}</span>
+      return `
+        <div class="reward-card">
+          <img class="reward-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(reward.name)}">
+          <div class="reward-body">
+            <span class="reward-category">${escapeHtml(reward.category || '未分類')}</span>
+            <h3>${escapeHtml(reward.name)}</h3>
+            <p>${escapeHtml(reward.description || '')}</p>
+            <div class="reward-meta">
+              <span>${escapeHtml(reward.points_cost)} 點</span>
+              <span>庫存 ${escapeHtml(reward.stock)}</span>
+            </div>
+            <button class="btn btn-primary shop-redeem-btn" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
+              ${!loggedIn ? '登入後兌換' : stockEmpty ? '已無庫存' : '兌換'}
+            </button>
           </div>
-          <button class="btn btn-primary shop-redeem-btn" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
-            ${!loggedIn ? '登入後兌換' : (stockEmpty ? '已無庫存' : '兌換')}
-          </button>
         </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    })
+    .join('');
 
   els.shopRewardsList.querySelectorAll('.shop-redeem-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const rewardId = btn.getAttribute('data-reward-id');
+      const rewardId = Number(btn.dataset.rewardId);
       await redeemReward(rewardId);
     });
   });
@@ -259,14 +278,14 @@ async function redeemReward(rewardId) {
   }
 }
 
-async function loadPublicLeaderboardAndRewards() {
+async function loadPublicData() {
   try {
     const data = await callApi('get_public_leaderboard');
     state.allRewards = data.rewards || [];
     renderCategoryTabs();
     renderShopRewards();
   } catch (error) {
-    console.error('loadPublicLeaderboardAndRewards error =', error);
+    console.error('loadPublicData error =', error);
     state.allRewards = [];
     renderCategoryTabs();
     renderShopRewards();
@@ -285,6 +304,9 @@ async function bootstrapDashboard() {
 async function signIn() {
   try {
     clearMessage();
+
+    const config = getConfig();
+    if (!config.liffId) throw new Error('config.js 尚未設定 liffId');
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
 
     if (!liff.isLoggedIn()) {
@@ -321,13 +343,18 @@ async function signOut() {
 }
 
 async function bootstrap() {
+  if (state.isBootstrapping) return;
+  state.isBootstrapping = true;
+
   clearMessage();
 
   try {
-    if (!config?.liffId) throw new Error('config.js 尚未設定 liffId');
-    if (!config?.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
-    if (!config?.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
-    if (!config?.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
+    const config = getConfig();
+
+    if (!config.liffId) throw new Error('config.js 尚未設定 liffId');
+    if (!config.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
+    if (!config.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
+    if (!config.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
 
     await liff.init({
@@ -354,6 +381,7 @@ async function bootstrap() {
     renderLoggedOut();
     showMessage(`初始化失敗：${normalizeError(error)}`, true);
   } finally {
+    state.isBootstrapping = false;
     if (els.appReady) els.appReady.style.display = 'block';
   }
 }
@@ -365,6 +393,7 @@ function bindEvents() {
 
 document.addEventListener('DOMContentLoaded', async () => {
   bindEvents();
-  await loadPublicLeaderboardAndRewards();
+  renderLoggedOut();
+  await loadPublicData();
   await bootstrap();
 });
