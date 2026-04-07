@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ICL 嚴選好物</title>
+  <title>ICL 會員點數中心</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
@@ -11,12 +11,12 @@
     <section class="hero-card">
       <div class="hero-content">
         <p class="eyebrow">會員中心</p>
-        <h1>ICL 嚴選好物</h1>
-        <p class="hero-text">好好玩~好開心~還可以累積點數換獎品喔！</p>
+        <h1>ICL 會員點數中心</h1>
+        <p class="hero-text">夾娃娃累積點數、查詢排行榜、兌換獎品都在這裡完成。</p>
       </div>
 
       <div class="hero-actions" id="auth-section">
-        <button class="btn btn-primary" id="login-btn">使用 LINE 登入</button>
+        <button class="btn btn-primary" id="login-btn" type="button">使用 LINE 登入</button>
       </div>
     </section>
 
@@ -38,7 +38,7 @@
         </div>
 
         <div class="member-actions">
-          <button class="btn btn-secondary" id="logout-btn" style="display:none;">登出</button>
+          <button class="btn btn-secondary" id="logout-btn" type="button" style="display:none;">登出</button>
         </div>
       </div>
 
@@ -55,8 +55,9 @@
             class="input"
             maxlength="20"
             placeholder="請輸入你的暱稱"
+            autocomplete="off"
           />
-          <button class="btn btn-primary" id="nickname-save-btn">更新暱稱</button>
+          <button class="btn btn-primary" id="nickname-save-btn" type="button">更新暱稱</button>
         </div>
 
         <p class="nickname-tip">限制：2~20 字，不能和別人重複，可用中文、英文、數字、空格、底線、連字號。</p>
@@ -92,8 +93,9 @@
             id="admin-search-input"
             class="input"
             placeholder="輸入會員名稱或暱稱"
+            autocomplete="off"
           />
-          <button class="btn btn-secondary" id="admin-search-btn">搜尋</button>
+          <button class="btn btn-secondary" id="admin-search-btn" type="button">搜尋</button>
         </div>
         <div id="admin-search-results" class="list-wrap"></div>
       </div>
@@ -102,21 +104,21 @@
         <div class="admin-block admin-panel">
           <h3>手動加點</h3>
           <div class="form-grid single-col">
-            <input type="text" id="grant-points-member-id" class="input" placeholder="會員 ID" />
-            <input type="number" id="grant-points-value" class="input" placeholder="加點點數" />
-            <input type="text" id="grant-points-reason" class="input" placeholder="加點原因" />
+            <input type="text" id="grant-points-member-id" class="input" placeholder="會員 ID" autocomplete="off" />
+            <input type="number" id="grant-points-value" class="input" placeholder="加點點數" min="1" step="1" />
+            <input type="text" id="grant-points-reason" class="input" placeholder="加點原因" maxlength="100" autocomplete="off" />
           </div>
-          <button class="btn btn-primary" id="grant-points-btn">確認加點</button>
+          <button class="btn btn-primary" id="grant-points-btn" type="button">確認加點</button>
         </div>
 
         <div class="admin-block admin-panel">
           <h3>手動扣點</h3>
           <div class="form-grid single-col">
-            <input type="text" id="deduct-points-member-id" class="input" placeholder="會員 ID" />
-            <input type="number" id="deduct-points-value" class="input" placeholder="扣點點數" />
-            <input type="text" id="deduct-points-reason" class="input" placeholder="扣點原因" />
+            <input type="text" id="deduct-points-member-id" class="input" placeholder="會員 ID" autocomplete="off" />
+            <input type="number" id="deduct-points-value" class="input" placeholder="扣點點數" min="1" step="1" />
+            <input type="text" id="deduct-points-reason" class="input" placeholder="扣點原因" maxlength="100" autocomplete="off" />
           </div>
-          <button class="btn btn-danger" id="deduct-points-btn">確認扣點</button>
+          <button class="btn btn-danger" id="deduct-points-btn" type="button">確認扣點</button>
         </div>
       </div>
     </section>
