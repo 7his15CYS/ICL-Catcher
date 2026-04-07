@@ -44,23 +44,20 @@ const state = {
 function normalizeError(err, fallback = '發生錯誤') {
   if (err == null) return fallback;
 
-  if (typeof err === 'string') return err === '[object Object]' ? fallback : err;
+  if (typeof err === 'string') {
+    return err === '[object Object]' ? fallback : err;
+  }
 
   if (err instanceof Error) {
-    return err.message && err.message !== '[object Object]' ? err.message : fallback;
+    return err.message && err.message !== '[object Object]'
+      ? err.message
+      : fallback;
   }
 
   if (typeof err === 'object') {
-    if (err.debug && typeof err.debug === 'object') {
-      if (typeof err.debug.message === 'string' && err.debug.message !== '[object Object]') return err.debug.message;
-      if (typeof err.debug.error_description === 'string') return err.debug.error_description;
-      if (typeof err.debug.error === 'string') return err.debug.error;
-      try {
-        return JSON.stringify(err.debug, null, 2);
-      } catch {}
+    if (typeof err.message === 'string' && err.message !== '[object Object]') {
+      return err.message;
     }
-
-    if (typeof err.message === 'string' && err.message !== '[object Object]') return err.message;
     if (typeof err.error_description === 'string') return err.error_description;
     if (typeof err.error === 'string') return err.error;
 
@@ -156,8 +153,12 @@ function renderLoggedOut() {
   if (els.memberName) els.memberName.textContent = '-';
   if (els.memberPoints) els.memberPoints.textContent = '0';
   if (els.memberAvatar) els.memberAvatar.src = '';
-  if (els.rewardsList) els.rewardsList.innerHTML = '<div class="empty-state">登入後可查看可兌換商品</div>';
-  if (els.redemptionList) els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
+  if (els.rewardsList) {
+    els.rewardsList.innerHTML = '<div class="empty-state">登入後可查看可兌換商品</div>';
+  }
+  if (els.redemptionList) {
+    els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
+  }
   if (els.adminSearchResults) els.adminSearchResults.innerHTML = '';
   if (els.nicknameInput) els.nicknameInput.value = '';
 }
@@ -286,8 +287,12 @@ function renderDashboard(data) {
   if (els.loginBtn) els.loginBtn.style.display = 'none';
 
   const member = data.member || {};
-  if (els.memberName) els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
-  if (els.memberPoints) els.memberPoints.textContent = String(data.points ?? 0);
+  if (els.memberName) {
+    els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
+  }
+  if (els.memberPoints) {
+    els.memberPoints.textContent = String(data.points ?? 0);
+  }
 
   if (els.memberAvatar) {
     els.memberAvatar.src =
@@ -346,11 +351,14 @@ async function saveNickname() {
 async function redeemReward(rewardId) {
   try {
     clearMessage();
-    if (!state.dashboard?.member?.id) throw new Error('尚未取得會員資料');
+
+    if (!state.dashboard?.member?.id) {
+      throw new Error('尚未取得會員資料');
+    }
 
     await callApi('redeem', {
       memberId: state.dashboard.member.id,
-      rewardId,
+      rewardId: Number(rewardId),
     });
 
     showMessage('兌換成功');
@@ -364,14 +372,9 @@ async function redeemReward(rewardId) {
 async function searchMembers() {
   try {
     clearMessage();
-    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
 
     const keyword = els.adminSearchInput?.value?.trim() || '';
-    const data = await callApi('search_members', {
-      keyword,
-      adminLineUserId: state.profile.userId,
-    });
-
+    const data = await callApi('search_members', { keyword });
     renderAdminSearchResults(data.members || []);
   } catch (error) {
     console.error('searchMembers error =', error);
@@ -382,8 +385,6 @@ async function searchMembers() {
 async function grantPoints() {
   try {
     clearMessage();
-
-    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
 
     const memberId = els.grantPointsMemberId?.value?.trim();
     const points = Number(els.grantPointsValue?.value || 0);
@@ -397,7 +398,6 @@ async function grantPoints() {
       memberId,
       points,
       reason,
-      adminLineUserId: state.profile.userId,
     });
 
     showMessage(result.message || '加點成功');
@@ -416,8 +416,6 @@ async function deductPoints() {
   try {
     clearMessage();
 
-    if (!state.profile?.userId) throw new Error('尚未取得 LINE 使用者資訊');
-
     const memberId = els.deductPointsMemberId?.value?.trim();
     const points = Number(els.deductPointsValue?.value || 0);
     const reason = els.deductPointsReason?.value?.trim();
@@ -430,7 +428,6 @@ async function deductPoints() {
       memberId,
       points,
       reason,
-      adminLineUserId: state.profile.userId,
     });
 
     showMessage(result.message || '扣點成功');
@@ -448,6 +445,7 @@ async function deductPoints() {
 async function signIn() {
   try {
     clearMessage();
+
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
 
     if (!liff.isLoggedIn()) {
