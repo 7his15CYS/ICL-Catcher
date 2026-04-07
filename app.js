@@ -1,4 +1,4 @@
-const config = window.APP_CONFIG;
+const config = window.APP_CONFIG || {};
 
 const els = {
   appReady: document.getElementById('app-ready'),
@@ -39,6 +39,8 @@ const state = {
   accessToken: null,
   profile: null,
   dashboard: null,
+  isBootstrapping: false,
+  bootstrapRetryCount: 0,
 };
 
 function normalizeError(err, fallback = '發生錯誤') {
@@ -112,13 +114,14 @@ function hasLiffRedirectParams() {
 }
 
 async function callApi(action, payload = {}) {
-  const url = `${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`;
+  const currentConfig = window.APP_CONFIG || {};
+  const url = `${currentConfig.supabaseUrl}/functions/v1/${currentConfig.apiFunctionName}`;
 
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      apikey: config.supabaseAnonKey,
+      apikey: currentConfig.supabaseAnonKey,
     },
     body: JSON.stringify({
       action,
@@ -448,6 +451,11 @@ async function signIn() {
 
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
 
+    const currentConfig = window.APP_CONFIG || {};
+    if (!currentConfig.liffId) {
+      throw new Error('config.js 尚未設定 liffId');
+    }
+
     if (!liff.isLoggedIn()) {
       liff.login({ redirectUri: getCleanAppUrl() });
       return;
@@ -482,23 +490,32 @@ async function signOut() {
 }
 
 async function bootstrap() {
+  if (state.isBootstrapping) return;
+  state.isBootstrapping = true;
+
   clearMessage();
 
   try {
-    const currentConfig = window.APP_CONFIG;
+    const currentConfig = window.APP_CONFIG || {};
 
     if (!currentConfig.liffId) {
-      // 不要立刻噴錯，等一下再試一次
-      setTimeout(() => {
-        bootstrap();
-      }, 200);
-      return;
+      if (state.bootstrapRetryCount < 10) {
+        state.bootstrapRetryCount += 1;
+        state.isBootstrapping = false;
+        setTimeout(() => {
+          bootstrap();
+        }, 150);
+        return;
+      }
+      throw new Error('config.js 尚未設定 liffId');
     }
 
     if (!currentConfig.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
     if (!currentConfig.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
     if (!currentConfig.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
+
+    state.bootstrapRetryCount = 0;
 
     await liff.init({
       liffId: currentConfig.liffId,
@@ -526,6 +543,7 @@ async function bootstrap() {
     await loadPublicLeaderboard();
     showMessage(`初始化失敗：${normalizeError(error)}`, true);
   } finally {
+    state.isBootstrapping = false;
     if (els.appReady) els.appReady.style.display = 'block';
   }
 }
