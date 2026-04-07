@@ -18,10 +18,10 @@ const els = {
   ichibanDetailStats: document.getElementById('ichiban-detail-stats'),
   ichibanPrizeList: document.getElementById('ichiban-prize-list'),
   ticketGrid: document.getElementById('ticket-grid'),
-  playIchibanBtn: document.getElementById('play-ichiban-btn'),
   refreshIchibanBtn: document.getElementById('refresh-ichiban-btn'),
   leaveIchibanBtn: document.getElementById('leave-ichiban-btn'),
   lockStatus: document.getElementById('ichiban-lock-status'),
+  lockTimer: document.getElementById('ichiban-lock-timer'),
   historySection: document.getElementById('ichiban-history-section'),
   historyList: document.getElementById('ichiban-history-list'),
 };
@@ -33,8 +33,9 @@ const state = {
   events: [],
   currentEventId: new URL(window.location.href).searchParams.get('eventId') || null,
   currentEvent: null,
-  selectedTicketId: null,
-  lockHeartbeat: null,
+  idleReleaseTimeout: null,
+  lockCountdownInterval: null,
+  activityKeepalivePromise: null,
 };
 
 function normalizeError(err, fallback = '發生錯誤') {
@@ -49,7 +50,10 @@ function escapeHtml(value) {
 }
 function showMessage(message, isError = false) {
   const text = typeof message === 'string' ? message : normalizeError(message);
-  if (!text) { els.messageBox.style.display = 'none'; return; }
+  if (!text) {
+    els.messageBox.style.display = 'none';
+    return;
+  }
   els.messageBox.textContent = text;
   els.messageBox.style.display = 'block';
   els.messageBox.className = isError ? 'message error' : 'message success';
@@ -61,14 +65,19 @@ function setButtonLoading(button, isLoading, loadingText = '處理中...') {
   button.disabled = isLoading;
   button.textContent = isLoading ? loadingText : button.dataset.originalText;
 }
-function startPending(key) { if (state.pending.has(key)) throw new Error('上一個操作尚未完成'); state.pending.add(key); }
+function startPending(key) {
+  if (state.pending.has(key)) throw new Error('上一個操作尚未完成');
+  state.pending.add(key);
+}
 function endPending(key) { state.pending.delete(key); }
 function getCleanAppUrl() { return `${window.location.origin}${window.location.pathname}`; }
 function hasLiffRedirectParams() {
   const url = new URL(window.location.href);
   return url.searchParams.has('code') || url.searchParams.has('state') || url.searchParams.has('liffClientId') || url.searchParams.has('liffRedirectUri');
 }
-function makeRequestId(prefix) { return window.crypto?.randomUUID ? `${prefix}-${window.crypto.randomUUID()}` : `${prefix}-${Date.now()}`; }
+function makeRequestId(prefix) {
+  return window.crypto?.randomUUID ? `${prefix}-${window.crypto.randomUUID()}` : `${prefix}-${Date.now()}`;
+}
 
 async function callApi(action, payload = {}) {
   const config = getConfig();
@@ -107,6 +116,7 @@ function renderEventList() {
     els.ichibanEventList.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>';
     return;
   }
+
   els.ichibanEventList.innerHTML = state.events.map((event) => `
     <div class="reward-card">
       <img class="reward-image" src="${escapeHtml(event.cover_image_url || 'https://placehold.co/600x400?text=Ichiban')}" alt="${escapeHtml(event.title)}">
@@ -124,11 +134,93 @@ function renderEventList() {
   });
 }
 
+function getRemainingLockSeconds() {
+  const lockedUntil = state.currentEvent?.lock_status?.locked_until ? new Date(state.currentEvent.lock_status.locked_until).getTime() : 0;
+  if (!lockedUntil) return 0;
+  return Math.max(0, Math.ceil((lockedUntil - Date.now()) / 1000));
+}
+
+function stopLockTimers() {
+  if (state.idleReleaseTimeout) {
+    window.clearTimeout(state.idleReleaseTimeout);
+    state.idleReleaseTimeout = null;
+  }
+  if (state.lockCountdownInterval) {
+    window.clearInterval(state.lockCountdownInterval);
+    state.lockCountdownInterval = null;
+  }
+}
+
+function updateLockStatusUi() {
+  const lock = state.currentEvent?.lock_status;
+  if (!lock) {
+    els.lockStatus.textContent = '未進入';
+    els.lockStatus.className = 'status-chip idle';
+    els.lockTimer.textContent = '-';
+    els.lockTimer.className = 'status-chip idle';
+    return;
+  }
+
+  if (lock.is_locked && lock.is_mine) {
+    els.lockStatus.textContent = '你已鎖定活動，可直接點籤抽獎';
+    els.lockStatus.className = 'status-chip busy';
+    const remain = getRemainingLockSeconds();
+    els.lockTimer.textContent = remain > 0 ? `鎖定倒數 ${remain}s` : '鎖定已到期';
+    els.lockTimer.className = `status-chip ${remain > 0 ? 'busy' : 'idle'}`;
+    return;
+  }
+
+  if (lock.is_locked && !lock.is_mine) {
+    els.lockStatus.textContent = `鎖定中：${lock.locked_by_display_name || '其他玩家'}`;
+    els.lockStatus.className = 'status-chip busy';
+    const remain = getRemainingLockSeconds();
+    els.lockTimer.textContent = remain > 0 ? `約 ${remain}s 後可進入` : '可重新整理';
+    els.lockTimer.className = 'status-chip idle';
+    return;
+  }
+
+  els.lockStatus.textContent = '目前未鎖定';
+  els.lockStatus.className = 'status-chip idle';
+  els.lockTimer.textContent = '可直接抽獎';
+  els.lockTimer.className = 'status-chip idle';
+}
+
+function startLockCountdown() {
+  if (!state.currentEvent?.lock_status?.is_mine) {
+    stopLockTimers();
+    updateLockStatusUi();
+    return;
+  }
+
+  stopLockTimers();
+  updateLockStatusUi();
+
+  const remainMs = Math.max(0, (new Date(state.currentEvent.lock_status.locked_until).getTime() || 0) - Date.now());
+  state.idleReleaseTimeout = window.setTimeout(async () => {
+    try {
+      if (!state.currentEventId) return;
+      await callApi('release_ichiban_lock', { eventId: state.currentEventId });
+      await openEvent(state.currentEventId, { silent: true });
+      showMessage('你太久沒有下一步操作，系統已自動解除鎖定。', true);
+    } catch {
+      // ignore network errors here; TTL in DB still protects the lock expiry.
+    }
+  }, remainMs + 800);
+
+  state.lockCountdownInterval = window.setInterval(() => {
+    updateLockStatusUi();
+    if (getRemainingLockSeconds() <= 0) {
+      stopLockTimers();
+    }
+  }, 1000);
+}
+
 function renderCurrentEvent() {
   const event = state.currentEvent;
   if (!event) {
     els.ichibanDetailSection.style.display = 'none';
     els.historySection.style.display = 'none';
+    updateLockStatusUi();
     return;
   }
 
@@ -151,14 +243,8 @@ function renderCurrentEvent() {
 
   renderTickets(event.tickets || []);
   renderHistory(event.my_results || []);
-  const busyText = event.lock_status?.is_locked && !event.lock_status?.is_mine
-    ? `鎖定中：${event.lock_status.locked_by_display_name || '其他玩家'}`
-    : event.lock_status?.is_mine
-    ? '你已鎖定活動，可開始選籤'
-    : '未鎖定';
-  els.lockStatus.textContent = busyText;
-  els.lockStatus.className = `status-chip ${event.lock_status?.is_locked ? 'busy' : 'idle'}`;
-  els.playIchibanBtn.disabled = !event.lock_status?.is_mine || !state.selectedTicketId;
+  updateLockStatusUi();
+  startLockCountdown();
 }
 
 function renderTickets(tickets) {
@@ -166,21 +252,47 @@ function renderTickets(tickets) {
     els.ticketGrid.innerHTML = '<div class="empty-state">沒有可用籤紙</div>';
     return;
   }
+
   els.ticketGrid.innerHTML = tickets.map((ticket) => {
-    const isSelected = state.selectedTicketId === ticket.id;
     const classes = ['ticket-tile'];
-    if (isSelected) classes.push('selected');
-    return `<button class="${classes.join(' ')}" type="button" data-ticket-id="${escapeHtml(ticket.id)}" ${ticket.status !== 'available' ? 'disabled' : ''}><span class="ticket-label">${escapeHtml(ticket.display_no)}</span></button>`;
+    if (ticket.status === 'drawn') classes.push('drawn');
+    if (ticket.status === 'drawn' && ticket.drawn_by_me) classes.push('mine');
+
+    const resultHtml = ticket.status === 'drawn'
+      ? `<span class="ticket-result">${escapeHtml(ticket.result_label || '未中獎')}</span>`
+      : `<span class="ticket-label">${escapeHtml(ticket.display_no)}</span>`;
+
+    const subHtml = ticket.status === 'drawn'
+      ? `<span class="ticket-no">${escapeHtml(ticket.display_no)}</span>`
+      : '';
+
+    const disabled = ticket.status !== 'available' ? 'disabled' : '';
+    return `<button class="${classes.join(' ')}" type="button" data-ticket-id="${escapeHtml(ticket.id)}" data-ticket-no="${escapeHtml(ticket.display_no)}" ${disabled}>${subHtml}${resultHtml}</button>`;
   }).join('');
 
-  els.ticketGrid.querySelectorAll('.ticket-tile').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      if (!state.currentEvent?.lock_status?.is_mine) {
-        showMessage('請先取得活動鎖定後再選籤', true);
+  els.ticketGrid.querySelectorAll('.ticket-tile:not(.drawn)').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!state.currentEventId || !state.currentEvent) return;
+      if (!state.currentEvent.lock_status?.is_mine) {
+        showMessage('請先取得活動鎖定後再抽。', true);
         return;
       }
-      state.selectedTicketId = btn.dataset.ticketId;
-      renderCurrentEvent();
+
+      try {
+        await extendMyLock('select-ticket');
+      } catch (error) {
+        showMessage(normalizeError(error, '鎖定已失效，請重新進入活動'), true);
+        await refreshEvent();
+        return;
+      }
+
+      const ticketNo = btn.dataset.ticketNo || '';
+      const ok = window.confirm(`確定抽 ${ticketNo} 號籤嗎？\n本次會扣除 ${state.currentEvent.point_cost} 點。`);
+      if (!ok) {
+        showMessage('已取消抽獎，你的活動鎖定仍保留。');
+        return;
+      }
+      await playIchiban(btn.dataset.ticketId);
     });
   });
 }
@@ -208,15 +320,15 @@ async function loadDashboard() {
   renderEventList();
 }
 
-async function openEvent(eventId) {
+async function openEvent(eventId, options = {}) {
   const data = await callApi('get_ichiban_event_detail', { eventId });
   state.currentEventId = eventId;
   state.currentEvent = data.event;
-  state.selectedTicketId = null;
   renderCurrentEvent();
   const url = new URL(window.location.href);
   url.searchParams.set('eventId', eventId);
   window.history.replaceState({}, document.title, url.toString());
+  if (!options.silent) clearMessage();
 }
 
 async function enterEvent(eventId) {
@@ -225,9 +337,8 @@ async function enterEvent(eventId) {
     startPending(key);
     clearMessage();
     await callApi('acquire_ichiban_lock', { eventId });
-    await openEvent(eventId);
-    showMessage('已取得活動鎖定，現在其他人暫時不能搶進來。');
-    startHeartbeat();
+    await openEvent(eventId, { silent: true });
+    showMessage('已進入活動，現在可以直接點籤紙抽獎。');
   } catch (error) {
     showMessage(normalizeError(error, '進入活動失敗'), true);
   } finally {
@@ -235,66 +346,76 @@ async function enterEvent(eventId) {
   }
 }
 
-async function leaveEvent() {
+async function leaveEvent(options = {}) {
   if (!state.currentEventId) return;
+  stopLockTimers();
   try {
-    stopHeartbeat();
     await callApi('release_ichiban_lock', { eventId: state.currentEventId });
-  } catch {}
+  } catch {
+    // ignore best effort release
+  }
+  const releasedEventId = state.currentEventId;
   state.currentEvent = null;
-  state.selectedTicketId = null;
+  state.currentEventId = null;
   renderCurrentEvent();
-  showMessage('已離開活動並釋放鎖定');
+  const url = new URL(window.location.href);
+  url.searchParams.delete('eventId');
+  window.history.replaceState({}, document.title, url.toString());
+  if (!options.silent) showMessage('已離開活動並釋放鎖定');
+  await loadDashboard();
+  if (options.reopenEventId) {
+    await enterEvent(options.reopenEventId);
+  }
+  return releasedEventId;
 }
 
 async function refreshEvent() {
   if (!state.currentEventId) return;
   try {
-    await openEvent(state.currentEventId);
+    await openEvent(state.currentEventId, { silent: true });
   } catch (error) {
     showMessage(normalizeError(error, '刷新活動失敗'), true);
   }
 }
 
-async function playIchiban() {
+async function extendMyLock(reason = 'activity') {
+  if (!state.currentEventId || !state.currentEvent?.lock_status?.is_mine) return;
+  if (state.activityKeepalivePromise) return state.activityKeepalivePromise;
+  state.activityKeepalivePromise = (async () => {
+    const data = await callApi('keepalive_ichiban_lock', { eventId: state.currentEventId, reason });
+    if (state.currentEvent?.lock_status) {
+      state.currentEvent.lock_status.locked_until = data.locked_until || state.currentEvent.lock_status.locked_until;
+      state.currentEvent.lock_status.is_locked = true;
+      state.currentEvent.lock_status.is_mine = true;
+    }
+    startLockCountdown();
+  })();
+  try {
+    await state.activityKeepalivePromise;
+  } finally {
+    state.activityKeepalivePromise = null;
+  }
+}
+
+async function playIchiban(ticketId) {
   const key = 'playIchiban';
   try {
     startPending(key);
-    setButtonLoading(els.playIchibanBtn, true, '抽獎中...');
     clearMessage();
-    if (!state.currentEventId || !state.selectedTicketId) throw new Error('請先選擇籤紙');
+    if (!state.currentEventId || !ticketId) throw new Error('請先選擇籤紙');
     const result = await callApi('play_ichiban', {
       eventId: state.currentEventId,
-      ticketId: state.selectedTicketId,
+      ticketId,
       requestId: makeRequestId('ichiban-play'),
     });
     showMessage(`抽獎成功：你抽到 ${result.result?.prize_name || '未中獎'}，已扣 ${result.result?.points_spent || 0} 點`);
     await loadDashboard();
-    await openEvent(state.currentEventId);
+    await openEvent(state.currentEventId, { silent: true });
   } catch (error) {
     showMessage(normalizeError(error, '抽獎失敗'), true);
+    await refreshEvent();
   } finally {
     endPending(key);
-    setButtonLoading(els.playIchibanBtn, false);
-  }
-}
-
-function startHeartbeat() {
-  stopHeartbeat();
-  state.lockHeartbeat = window.setInterval(async () => {
-    if (!state.currentEventId) return;
-    try {
-      await callApi('keepalive_ichiban_lock', { eventId: state.currentEventId });
-      await openEvent(state.currentEventId);
-    } catch {
-      stopHeartbeat();
-    }
-  }, 20000);
-}
-function stopHeartbeat() {
-  if (state.lockHeartbeat) {
-    window.clearInterval(state.lockHeartbeat);
-    state.lockHeartbeat = null;
   }
 }
 
@@ -307,7 +428,7 @@ async function signIn() {
 }
 
 async function signOut() {
-  await leaveEvent();
+  await leaveEvent({ silent: true });
   if (window.liff && liff.isLoggedIn()) liff.logout();
   state.accessToken = null;
   state.dashboard = null;
@@ -318,35 +439,56 @@ async function signOut() {
 async function bootstrap() {
   try {
     const config = getConfig();
-    await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: true });
-    if (liff.isLoggedIn() && hasLiffRedirectParams()) {
-      window.history.replaceState({}, document.title, getCleanAppUrl() + (state.currentEventId ? `?eventId=${encodeURIComponent(state.currentEventId)}` : ''));
+    if (!config.liffId || !config.supabaseUrl || !config.supabaseAnonKey || !config.apiFunctionName) {
+      throw new Error('請先設定 config.js');
     }
-    if (!liff.isLoggedIn()) { renderLoggedOut(); return; }
+
+    await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: false });
+
+    if (!liff.isLoggedIn()) {
+      renderLoggedOut();
+      if (hasLiffRedirectParams()) {
+        const url = new URL(window.location.href);
+        ['code', 'state', 'liffClientId', 'liffRedirectUri'].forEach((key) => url.searchParams.delete(key));
+        window.history.replaceState({}, document.title, url.toString());
+      }
+      return;
+    }
+
     state.accessToken = liff.getAccessToken();
     await loadDashboard();
+
     if (state.currentEventId) {
-      await enterEvent(state.currentEventId);
+      try {
+        await enterEvent(state.currentEventId);
+      } catch {
+        await refreshEvent();
+      }
     }
   } catch (error) {
     renderLoggedOut();
-    showMessage(`初始化失敗：${normalizeError(error)}`, true);
-  } finally {
-    els.appReady.style.display = 'block';
+    showMessage(normalizeError(error, '初始化失敗'), true);
   }
 }
 
-function bindEvents() {
-  els.loginBtn.addEventListener('click', signIn);
-  els.logoutBtn.addEventListener('click', signOut);
-  els.playIchibanBtn.addEventListener('click', playIchiban);
-  els.refreshIchibanBtn.addEventListener('click', refreshEvent);
-  els.leaveIchibanBtn.addEventListener('click', leaveEvent);
-  window.addEventListener('beforeunload', () => { stopHeartbeat(); });
-}
-
-document.addEventListener('DOMContentLoaded', async () => {
-  bindEvents();
-  renderLoggedOut();
-  await bootstrap();
+els.loginBtn?.addEventListener('click', signIn);
+els.logoutBtn?.addEventListener('click', signOut);
+els.refreshIchibanBtn?.addEventListener('click', async () => {
+  try {
+    await extendMyLock('manual-refresh');
+  } catch {}
+  await refreshEvent();
+  showMessage('活動資料已更新');
 });
+els.leaveIchibanBtn?.addEventListener('click', () => leaveEvent());
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState === 'hidden') return;
+  if (state.currentEventId) await refreshEvent();
+});
+
+window.addEventListener('pagehide', () => {
+  stopLockTimers();
+});
+
+bootstrap();
