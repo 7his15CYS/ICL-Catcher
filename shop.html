@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ICL嚴選好物-點數商店</title>
   <link rel="stylesheet" href="./styles.css" />
-  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-  <script src="./config.js"></script>
-  <script src="./shop.js"></script>
 </head>
 <body>
   <main class="page" id="app-ready" style="display:block;">
@@ -27,7 +24,12 @@
 
     <section class="card" id="member-section" style="display:none;">
       <div class="member-header">
-        <img id="member-avatar" class="member-avatar" src="https://placehold.co/96x96?text=User" alt="會員頭像" />
+        <img
+          id="member-avatar"
+          class="member-avatar"
+          src="https://placehold.co/96x96?text=User"
+          alt="會員頭像"
+        />
         <div class="member-info">
           <h2 id="member-name">-</h2>
           <p class="points-label">目前點數</p>
@@ -45,8 +47,7 @@
         <a class="more-link" href="./index.html">← 回會員中心</a>
       </div>
 
-      <div class="category-tabs" id="category-tabs"></div><div class="category-tabs" id="category-tabs"></div>
-      
+      <div class="category-tabs" id="category-tabs"></div>
     </section>
 
     <section class="card">
@@ -56,5 +57,9 @@
       <div id="shop-rewards-list" class="reward-grid"></div>
     </section>
   </main>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="./config.js"></script>
+  <script src="./shop.js"></script>
 </body>
 </html>
