@@ -17,11 +17,13 @@ const els = {
   redemptionList: document.getElementById('redemption-list'),
   leaderboardList: document.getElementById('leaderboard-list'),
   ichibanSummary: document.getElementById('ichiban-summary'),
+  ichibanSection: document.getElementById('ichiban-section'),
 
   adminSection: document.getElementById('admin-section'),
   adminSearchInput: document.getElementById('admin-search-input'),
   adminSearchBtn: document.getElementById('admin-search-btn'),
   adminSearchResults: document.getElementById('admin-search-results'),
+  ichibanVipGate: document.getElementById('ichiban-vip-gate'),
 
   grantPointsMemberId: document.getElementById('grant-points-member-id'),
   grantPointsValue: document.getElementById('grant-points-value'),
@@ -159,7 +161,8 @@ function renderLoggedOut() {
   if (els.loginBtn) els.loginBtn.style.display = 'inline-flex';
   if (els.rewardsList) els.rewardsList.innerHTML = '<div class="empty-state">登入後可查看可兌換商品</div>';
   if (els.redemptionList) els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
-  if (els.ichibanSummary) els.ichibanSummary.innerHTML = '<div class="empty-state">登入後可進入一番賞活動</div>';
+  if (els.ichibanSummary) els.ichibanSummary.innerHTML = '<div class="empty-state">登入後可查看 VIP 一番賞活動</div>';
+  if (els.ichibanSection) els.ichibanSection.style.display = 'block';
 }
 
 function renderRewards(rewards = []) {
@@ -226,6 +229,16 @@ function renderLeaderboard(list = []) {
 
 function renderIchibanSummary(events = []) {
   if (!els.ichibanSummary) return;
+  const member = state.dashboard?.member || {};
+  const canViewIchiban = !!(member.is_admin || member.member_role === 'vip');
+  if (els.ichibanSection) els.ichibanSection.style.display = canViewIchiban ? 'block' : 'none';
+  if (els.ichibanVipGate) {
+    els.ichibanVipGate.style.display = canViewIchiban ? 'none' : 'block';
+  }
+  if (!canViewIchiban) {
+    els.ichibanSummary.innerHTML = '';
+    return;
+  }
   if (!events.length) {
     els.ichibanSummary.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>';
     return;
@@ -246,17 +259,24 @@ function renderAdminSearchResults(members = []) {
     els.adminSearchResults.innerHTML = '<div class="empty-state">找不到符合條件的會員</div>';
     return;
   }
-  els.adminSearchResults.innerHTML = members.map((member) => `
-    <div class="list-item">
+  els.adminSearchResults.innerHTML = members.map((member) => {
+    const roleLabel = member.member_role === 'vip' ? 'VIP' : '一般會員';
+    return `
+    <div class="list-item list-item-stack">
       <div class="leaderboard-user">
         <img class="leaderboard-avatar" src="${escapeHtml(member.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(member.nickname || member.display_name)}">
         <div>
           <div class="list-title">${escapeHtml(member.nickname || member.display_name)}</div>
-          <div class="list-subtitle">ID：${escapeHtml(member.id)} ・ 目前 ${escapeHtml(member.current_points ?? 0)} 點</div>
+          <div class="list-subtitle">ID：${escapeHtml(member.id)} ・ 目前 ${escapeHtml(member.current_points ?? 0)} 點 ・ 身分：${escapeHtml(roleLabel)}</div>
         </div>
       </div>
-      <button class="btn btn-secondary select-member-btn" type="button" data-member-id="${escapeHtml(member.id)}">選取</button>
-    </div>`).join('');
+      <div class="admin-chip-row">
+        <button class="btn btn-secondary select-member-btn" type="button" data-member-id="${escapeHtml(member.id)}">選取</button>
+        <button class="btn btn-secondary set-role-btn" type="button" data-member-id="${escapeHtml(member.id)}" data-role="regular">設成一般客人</button>
+        <button class="btn btn-primary set-role-btn" type="button" data-member-id="${escapeHtml(member.id)}" data-role="vip">設成 VIP</button>
+      </div>
+    </div>`;
+  }).join('');
 
   els.adminSearchResults.querySelectorAll('.select-member-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -264,6 +284,12 @@ function renderAdminSearchResults(members = []) {
       if (els.grantPointsMemberId) els.grantPointsMemberId.value = memberId;
       if (els.deductPointsMemberId) els.deductPointsMemberId.value = memberId;
       showMessage('已帶入會員 ID');
+    });
+  });
+
+  els.adminSearchResults.querySelectorAll('.set-role-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      await updateMemberRole(btn.dataset.memberId || '', btn.dataset.role || 'regular', btn);
     });
   });
 }
@@ -392,6 +418,23 @@ async function searchMembers() {
     showMessage(normalizeError(error, '搜尋會員失敗'), true);
   } finally {
     endPending(key); setButtonLoading(els.adminSearchBtn, false);
+  }
+}
+
+async function updateMemberRole(memberId, memberRole, button) {
+  const key = `updateMemberRole:${memberId}`;
+  try {
+    startPending(key); setButtonLoading(button, true, '更新中...'); clearMessage();
+    const result = await callApi('admin_update_member_role', { memberId, memberRole });
+    showMessage(result.message || '會員身分已更新');
+    if (state.dashboard?.member?.id === memberId && result.dashboard) {
+      renderDashboard(result.dashboard);
+    }
+    await searchMembers();
+  } catch (error) {
+    showMessage(normalizeError(error, '更新會員身分失敗'), true);
+  } finally {
+    endPending(key); setButtonLoading(button, false);
   }
 }
 
