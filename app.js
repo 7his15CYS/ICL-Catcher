@@ -9,6 +9,9 @@ const els = {
   memberName: document.getElementById('member-name'),
   memberAvatar: document.getElementById('member-avatar'),
   memberPoints: document.getElementById('member-points'),
+  memberRoleBadge: document.getElementById('member-role-badge'),
+
+  ichibanSection: document.getElementById('ichiban-section'),
 
   nicknameInput: document.getElementById('nickname-input'),
   nicknameSaveBtn: document.getElementById('nickname-save-btn'),
@@ -17,13 +20,11 @@ const els = {
   redemptionList: document.getElementById('redemption-list'),
   leaderboardList: document.getElementById('leaderboard-list'),
   ichibanSummary: document.getElementById('ichiban-summary'),
-  ichibanSection: document.getElementById('ichiban-section'),
 
   adminSection: document.getElementById('admin-section'),
   adminSearchInput: document.getElementById('admin-search-input'),
   adminSearchBtn: document.getElementById('admin-search-btn'),
   adminSearchResults: document.getElementById('admin-search-results'),
-  ichibanVipGate: document.getElementById('ichiban-vip-gate'),
 
   grantPointsMemberId: document.getElementById('grant-points-member-id'),
   grantPointsValue: document.getElementById('grant-points-value'),
@@ -154,15 +155,18 @@ async function callApi(action, payload = {}) {
 }
 
 function renderLoggedOut() {
+  state.dashboard = null;
+  state.ichibanEvents = [];
+
   if (els.authSection) els.authSection.style.display = 'block';
   if (els.memberSection) els.memberSection.style.display = 'none';
   if (els.adminSection) els.adminSection.style.display = 'none';
+  if (els.ichibanSection) els.ichibanSection.style.display = 'none';
   if (els.logoutBtn) els.logoutBtn.style.display = 'none';
   if (els.loginBtn) els.loginBtn.style.display = 'inline-flex';
   if (els.rewardsList) els.rewardsList.innerHTML = '<div class="empty-state">登入後可查看可兌換商品</div>';
   if (els.redemptionList) els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
-  if (els.ichibanSummary) els.ichibanSummary.innerHTML = '<div class="empty-state">登入後可查看 VIP 一番賞活動</div>';
-  if (els.ichibanSection) els.ichibanSection.style.display = 'block';
+  if (els.ichibanSummary) els.ichibanSummary.innerHTML = '';
 }
 
 function renderRewards(rewards = []) {
@@ -229,16 +233,6 @@ function renderLeaderboard(list = []) {
 
 function renderIchibanSummary(events = []) {
   if (!els.ichibanSummary) return;
-  const member = state.dashboard?.member || {};
-  const canViewIchiban = !!(member.is_admin || member.member_role === 'vip');
-  if (els.ichibanSection) els.ichibanSection.style.display = canViewIchiban ? 'block' : 'none';
-  if (els.ichibanVipGate) {
-    els.ichibanVipGate.style.display = canViewIchiban ? 'none' : 'block';
-  }
-  if (!canViewIchiban) {
-    els.ichibanSummary.innerHTML = '';
-    return;
-  }
   if (!events.length) {
     els.ichibanSummary.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>';
     return;
@@ -348,23 +342,34 @@ function renderAdminIchibanPrizes(prizes = []) {
 
 function renderDashboard(data) {
   state.dashboard = data;
-  state.ichibanEvents = data.ichiban_events || [];
+
+  const member = data.member || {};
+  const isVip = member.member_role === 'vip';
+  state.ichibanEvents = isVip ? (data.ichiban_events || []) : [];
 
   if (els.authSection) els.authSection.style.display = 'none';
   if (els.memberSection) els.memberSection.style.display = 'block';
   if (els.logoutBtn) els.logoutBtn.style.display = 'inline-flex';
   if (els.loginBtn) els.loginBtn.style.display = 'none';
+  if (els.ichibanSection) els.ichibanSection.style.display = isVip ? 'block' : 'none';
 
-  const member = data.member || {};
   if (els.memberName) els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
   if (els.memberPoints) els.memberPoints.textContent = String(data.points ?? 0);
   if (els.memberAvatar) els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
   if (els.nicknameInput) els.nicknameInput.value = member.nickname || member.display_name || '';
+  if (els.memberRoleBadge) {
+    els.memberRoleBadge.textContent = isVip ? 'VIP 會員' : '一般會員';
+    els.memberRoleBadge.classList.toggle('vip', isVip);
+  }
 
   renderRewards(data.rewards || []);
   renderRedemptions(data.redemptions || []);
   renderLeaderboard(data.leaderboard || []);
-  renderIchibanSummary(data.ichiban_events || []);
+  if (isVip) {
+    renderIchibanSummary(data.ichiban_events || []);
+  } else if (els.ichibanSummary) {
+    els.ichibanSummary.innerHTML = '';
+  }
   renderAdminIchibanEvents();
 
   if (els.adminSection) {
@@ -427,9 +432,7 @@ async function updateMemberRole(memberId, memberRole, button) {
     startPending(key); setButtonLoading(button, true, '更新中...'); clearMessage();
     const result = await callApi('admin_update_member_role', { memberId, memberRole });
     showMessage(result.message || '會員身分已更新');
-    if (state.dashboard?.member?.id === memberId && result.dashboard) {
-      renderDashboard(result.dashboard);
-    }
+    if (state.dashboard?.member?.id === memberId) await bootstrapDashboard();
     await searchMembers();
   } catch (error) {
     showMessage(normalizeError(error, '更新會員身分失敗'), true);
