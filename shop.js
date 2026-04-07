@@ -26,6 +26,7 @@ const state = {
   allRewards: [],
   selectedCategory: '全部',
   isBootstrapping: false,
+  pending: new Set(),
 };
 
 function normalizeError(err, fallback = '發生錯誤') {
@@ -86,6 +87,36 @@ function hasLiffRedirectParams() {
     url.searchParams.has('liffClientId') ||
     url.searchParams.has('liffRedirectUri')
   );
+}
+
+function makeRequestId(prefix) {
+  if (window.crypto?.randomUUID) {
+    return `${prefix}-${window.crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function setButtonLoading(button, isLoading, loadingText = '處理中...') {
+  if (!button) return;
+
+  if (!button.dataset.originalText) {
+    button.dataset.originalText = button.textContent || '';
+  }
+
+  button.disabled = isLoading;
+  button.classList.toggle('is-loading', isLoading);
+  button.textContent = isLoading ? loadingText : button.dataset.originalText;
+}
+
+function startPending(key) {
+  if (state.pending.has(key)) {
+    throw new Error('上一個操作尚未完成，請稍候');
+  }
+  state.pending.add(key);
+}
+
+function endPending(key) {
+  state.pending.delete(key);
 }
 
 async function callApi(action, payload = {}) {
@@ -217,7 +248,7 @@ function renderShopRewards() {
   }
 
   if (!list.length) {
-    els.shopRewardsList.innerHTML = `<div class="empty-state">目前這個分類沒有商品</div>`;
+    els.shopRewardsList.innerHTML = '<div class="empty-state">目前這個分類沒有商品</div>';
     return;
   }
 
@@ -240,7 +271,7 @@ function renderShopRewards() {
               <span>${escapeHtml(reward.points_cost)} 點</span>
               <span>庫存 ${escapeHtml(reward.stock)}</span>
             </div>
-            <button class="btn btn-primary shop-redeem-btn" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
+            <button class="btn btn-primary shop-redeem-btn" type="button" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
               ${!loggedIn ? '登入後兌換' : stockEmpty ? '已無庫存' : '兌換'}
             </button>
           </div>
@@ -252,13 +283,16 @@ function renderShopRewards() {
   els.shopRewardsList.querySelectorAll('.shop-redeem-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const rewardId = Number(btn.dataset.rewardId);
-      await redeemReward(rewardId);
+      await redeemReward(rewardId, btn);
     });
   });
 }
 
-async function redeemReward(rewardId) {
+async function redeemReward(rewardId, button) {
+  const key = `shop-redeem:${rewardId}`;
   try {
+    startPending(key);
+    setButtonLoading(button, true, '兌換中...');
     clearMessage();
 
     if (!state.dashboard?.member?.id) {
@@ -268,6 +302,7 @@ async function redeemReward(rewardId) {
     await callApi('redeem', {
       memberId: state.dashboard.member.id,
       rewardId,
+      requestId: makeRequestId('redeem'),
     });
 
     showMessage('兌換成功');
@@ -275,6 +310,9 @@ async function redeemReward(rewardId) {
   } catch (error) {
     console.error('redeemReward error =', error);
     showMessage(normalizeError(error, '兌換失敗'), true);
+  } finally {
+    endPending(key);
+    setButtonLoading(button, false);
   }
 }
 
@@ -332,6 +370,7 @@ async function signOut() {
     state.accessToken = null;
     state.profile = null;
     state.dashboard = null;
+    state.pending.clear();
 
     renderLoggedOut();
     renderShopRewards();
