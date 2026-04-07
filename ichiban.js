@@ -24,6 +24,7 @@ const els = {
   lockTimer: document.getElementById('ichiban-lock-timer'),
   historySection: document.getElementById('ichiban-history-section'),
   historyList: document.getElementById('ichiban-history-list'),
+  vipOnlyNotice: document.getElementById('vip-only-notice'),
 };
 
 const state = {
@@ -98,6 +99,7 @@ function renderLoggedOut() {
   els.memberSection.style.display = 'none';
   els.logoutBtn.style.display = 'none';
   els.loginBtn.style.display = 'inline-flex';
+  if (els.vipOnlyNotice) els.vipOnlyNotice.style.display = 'none';
 }
 
 function renderMember(data) {
@@ -111,7 +113,24 @@ function renderMember(data) {
   els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
 }
 
+function isVipMember() {
+  const member = state.dashboard?.member || {};
+  return !!(member.is_admin || member.member_role === 'vip');
+}
+
+function renderVipDenied() {
+  if (els.vipOnlyNotice) els.vipOnlyNotice.style.display = 'block';
+  els.ichibanEventList.innerHTML = '<div class="empty-state">目前此功能僅開放 VIP 會員使用</div>';
+  els.ichibanDetailSection.style.display = 'none';
+  els.historySection.style.display = 'none';
+}
+
 function renderEventList() {
+  if (!isVipMember()) {
+    renderVipDenied();
+    return;
+  }
+  if (els.vipOnlyNotice) els.vipOnlyNotice.style.display = 'none';
   if (!state.events.length) {
     els.ichibanEventList.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>';
     return;
@@ -321,6 +340,7 @@ async function loadDashboard() {
 }
 
 async function openEvent(eventId, options = {}) {
+  if (!isVipMember()) throw new Error('此功能僅開放 VIP 會員');
   const data = await callApi('get_ichiban_event_detail', { eventId });
   state.currentEventId = eventId;
   state.currentEvent = data.event;
@@ -332,6 +352,11 @@ async function openEvent(eventId, options = {}) {
 }
 
 async function enterEvent(eventId) {
+  if (!isVipMember()) {
+    renderVipDenied();
+    showMessage('此功能僅開放 VIP 會員', true);
+    return;
+  }
   const key = `enter:${eventId}`;
   try {
     startPending(key);
@@ -458,7 +483,7 @@ async function bootstrap() {
     state.accessToken = liff.getAccessToken();
     await loadDashboard();
 
-    if (state.currentEventId) {
+    if (state.currentEventId && isVipMember()) {
       try {
         await enterEvent(state.currentEventId);
       } catch {
