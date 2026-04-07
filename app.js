@@ -167,11 +167,34 @@ function renderLoggedOut() {
   if (els.rewardsList) els.rewardsList.innerHTML = '<div class="empty-state">登入後可查看可兌換商品</div>';
   if (els.redemptionList) els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
   if (els.ichibanSummary) els.ichibanSummary.innerHTML = '';
-  if (els.memberRoleBadge) {
+  applyVipBadge(false);
+}
+
+
+function applyVipBadge(isVip) {
+  if (!els.memberRoleBadge) return;
+  if (!isVip) {
     els.memberRoleBadge.style.display = 'none';
-    els.memberRoleBadge.classList.remove('vip');
     els.memberRoleBadge.textContent = '';
+    els.memberRoleBadge.classList.remove('vip');
+    els.memberRoleBadge.style.background = '';
+    els.memberRoleBadge.style.color = '';
+    els.memberRoleBadge.style.border = '';
+    els.memberRoleBadge.style.boxShadow = '';
+    els.memberRoleBadge.style.fontWeight = '';
+    els.memberRoleBadge.style.letterSpacing = '';
+    return;
   }
+
+  els.memberRoleBadge.textContent = '★ VIP 會員';
+  els.memberRoleBadge.classList.add('vip');
+  els.memberRoleBadge.style.display = 'inline-flex';
+  els.memberRoleBadge.style.background = 'linear-gradient(135deg, #fff4bf 0%, #f7d774 45%, #d9a93d 100%)';
+  els.memberRoleBadge.style.color = '#5a3b00';
+  els.memberRoleBadge.style.border = '1px solid rgba(181, 130, 27, 0.45)';
+  els.memberRoleBadge.style.boxShadow = '0 8px 18px rgba(217, 169, 61, 0.24)';
+  els.memberRoleBadge.style.fontWeight = '800';
+  els.memberRoleBadge.style.letterSpacing = '0.04em';
 }
 
 function renderRewards(rewards = []) {
@@ -362,11 +385,7 @@ function renderDashboard(data) {
   if (els.memberPoints) els.memberPoints.textContent = String(data.points ?? 0);
   if (els.memberAvatar) els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
   if (els.nicknameInput) els.nicknameInput.value = member.nickname || member.display_name || '';
-  if (els.memberRoleBadge) {
-    els.memberRoleBadge.textContent = 'VIP 會員';
-    els.memberRoleBadge.classList.toggle('vip', isVip);
-    els.memberRoleBadge.style.display = isVip ? 'inline-flex' : 'none';
-  }
+  applyVipBadge(isVip);
 
   renderRewards(data.rewards || []);
   renderRedemptions(data.redemptions || []);
