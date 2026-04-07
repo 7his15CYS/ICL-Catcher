@@ -12,7 +12,7 @@
       <div class="hero-content">
         <p class="eyebrow">會員中心</p>
         <h1>ICL 會員點數中心</h1>
-        <p class="hero-text">夾娃娃累積點數、查詢排行榜、兌換獎品都在這裡完成。</p>
+        <p class="hero-text">夾娃娃累積點數、查詢排行榜、兌換獎品，以及線上一番賞都在這裡完成。</p>
       </div>
 
       <div class="hero-actions" id="auth-section">
@@ -66,6 +66,14 @@
 
     <section class="card">
       <div class="section-header">
+        <h2>線上一番賞</h2>
+        <a class="more-link" href="./ichiban.html">進入一番賞頁面 →</a>
+      </div>
+      <div id="ichiban-summary" class="list-wrap"></div>
+    </section>
+
+    <section class="card">
+      <div class="section-header">
         <h2>可兌換獎品</h2>
         <a class="more-link" href="./shop.html">更多獎品 →</a>
       </div>
@@ -84,6 +92,53 @@
 
     <section class="card" id="admin-section" style="display:none;">
       <h2>管理員功能</h2>
+
+      <div class="admin-block">
+        <h3>一番賞活動建立 / 更新</h3>
+        <p class="nickname-help">先建立活動，再新增獎項設定。建立後可在「進入一番賞頁面」看到活動卡片。</p>
+        <div class="form-grid two-col">
+          <input type="text" id="ichiban-event-id" class="input" placeholder="活動 ID（更新時填寫，新增可留空）" autocomplete="off" />
+          <input type="text" id="ichiban-title" class="input" placeholder="活動名稱，例如：鬼滅之刃 一番賞" autocomplete="off" />
+          <input type="number" id="ichiban-point-cost" class="input" placeholder="每抽點數" min="1" step="1" />
+          <input type="number" id="ichiban-total-tickets" class="input" placeholder="總籤數" min="1" step="1" />
+          <input type="text" id="ichiban-cover-image" class="input" placeholder="活動封面圖片 URL" autocomplete="off" />
+          <input type="number" id="ichiban-lock-seconds" class="input" placeholder="鎖定秒數（預設 90）" min="15" max="300" step="1" />
+        </div>
+        <textarea id="ichiban-description" class="input textarea" placeholder="活動說明 / 注意事項"></textarea>
+        <div class="admin-action-row">
+          <button class="btn btn-primary" id="save-ichiban-event-btn" type="button">儲存活動</button>
+          <button class="btn btn-secondary" id="load-ichiban-events-btn" type="button">重新讀取活動</button>
+        </div>
+        <div id="admin-ichiban-events" class="list-wrap"></div>
+      </div>
+
+      <div class="admin-two-col">
+        <div class="admin-block admin-panel">
+          <h3>一番賞獎項設定</h3>
+          <div class="form-grid single-col">
+            <input type="text" id="ichiban-prize-event-id" class="input" placeholder="活動 ID" autocomplete="off" />
+            <input type="text" id="ichiban-prize-name" class="input" placeholder="獎項名稱，例如：A賞 大公仔" autocomplete="off" />
+            <input type="number" id="ichiban-prize-count" class="input" placeholder="數量（幾張籤）" min="1" step="1" />
+            <input type="number" id="ichiban-prize-sort" class="input" placeholder="排序（越小越前面）" min="1" step="1" />
+            <input type="text" id="ichiban-prize-image" class="input" placeholder="獎項圖片 URL" autocomplete="off" />
+            <textarea id="ichiban-prize-description" class="input textarea" placeholder="獎項說明"></textarea>
+          </div>
+          <button class="btn btn-primary" id="save-ichiban-prize-btn" type="button">新增獎項</button>
+        </div>
+
+        <div class="admin-block admin-panel">
+          <h3>產生 / 重置籤池</h3>
+          <p class="nickname-help">完成獎項設定後，按一次「產生籤池」。系統會依照獎項數量自動補齊未中獎籤。</p>
+          <div class="form-grid single-col">
+            <input type="text" id="ichiban-generate-event-id" class="input" placeholder="活動 ID" autocomplete="off" />
+          </div>
+          <div class="admin-action-row">
+            <button class="btn btn-primary" id="generate-ichiban-tickets-btn" type="button">產生籤池</button>
+            <button class="btn btn-danger" id="release-ichiban-lock-btn" type="button">解除活動鎖定</button>
+          </div>
+          <div id="admin-ichiban-prizes" class="list-wrap"></div>
+        </div>
+      </div>
 
       <div class="admin-block">
         <h3>搜尋會員</h3>
