@@ -485,7 +485,7 @@ async function bootstrap() {
   clearMessage();
 
   try {
-    const currentConfig = window.APP_CONFIG || {};
+    const currentConfig = window.APP_CONFIG;
 
     if (!currentConfig.liffId) {
       // 不要立刻噴錯，等一下再試一次
