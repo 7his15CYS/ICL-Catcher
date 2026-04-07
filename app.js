@@ -1,5 +1,3 @@
-const config = window.APP_CONFIG || {};
-
 const els = {
   appReady: document.getElementById('app-ready'),
   authSection: document.getElementById('auth-section'),
@@ -39,30 +37,21 @@ const state = {
   accessToken: null,
   profile: null,
   dashboard: null,
-  isBootstrapping: false,
-  bootstrapRetryCount: 0,
 };
+
+function getConfig() {
+  return window.APP_CONFIG || {};
+}
 
 function normalizeError(err, fallback = '發生錯誤') {
   if (err == null) return fallback;
-
-  if (typeof err === 'string') {
-    return err === '[object Object]' ? fallback : err;
-  }
-
-  if (err instanceof Error) {
-    return err.message && err.message !== '[object Object]'
-      ? err.message
-      : fallback;
-  }
+  if (typeof err === 'string') return err === '[object Object]' ? fallback : err;
+  if (err instanceof Error) return err.message || fallback;
 
   if (typeof err === 'object') {
-    if (typeof err.message === 'string' && err.message !== '[object Object]') {
-      return err.message;
-    }
+    if (typeof err.message === 'string' && err.message) return err.message;
     if (typeof err.error_description === 'string') return err.error_description;
     if (typeof err.error === 'string') return err.error;
-
     try {
       return JSON.stringify(err, null, 2);
     } catch {
@@ -75,14 +64,16 @@ function normalizeError(err, fallback = '發生錯誤') {
 
 function showMessage(message, isError = false) {
   if (!els.messageBox) return;
+  const text = typeof message === 'string' ? message : normalizeError(message);
 
-  const finalMessage =
-    typeof message === 'string'
-      ? (message === '[object Object]' ? (isError ? '發生錯誤' : '') : message)
-      : normalizeError(message, isError ? '發生錯誤' : '');
+  if (!text) {
+    els.messageBox.style.display = 'none';
+    els.messageBox.textContent = '';
+    return;
+  }
 
-  els.messageBox.textContent = finalMessage || '';
-  els.messageBox.style.display = finalMessage ? 'block' : 'none';
+  els.messageBox.textContent = text;
+  els.messageBox.style.display = 'block';
   els.messageBox.className = isError ? 'message error' : 'message success';
 }
 
@@ -114,14 +105,13 @@ function hasLiffRedirectParams() {
 }
 
 async function callApi(action, payload = {}) {
-  const currentConfig = window.APP_CONFIG || {};
-  const url = `${currentConfig.supabaseUrl}/functions/v1/${currentConfig.apiFunctionName}`;
+  const config = getConfig();
 
-  const res = await fetch(url, {
+  const res = await fetch(`${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      apikey: currentConfig.supabaseAnonKey,
+      apikey: config.supabaseAnonKey,
     },
     body: JSON.stringify({
       action,
@@ -136,7 +126,7 @@ async function callApi(action, payload = {}) {
   try {
     data = text ? JSON.parse(text) : {};
   } catch {
-    data = { raw: text };
+    data = { message: text };
   }
 
   if (!res.ok || data.ok === false) {
@@ -153,32 +143,27 @@ function renderLoggedOut() {
   if (els.logoutBtn) els.logoutBtn.style.display = 'none';
   if (els.loginBtn) els.loginBtn.style.display = 'inline-flex';
 
-  if (els.memberName) els.memberName.textContent = '-';
-  if (els.memberPoints) els.memberPoints.textContent = '0';
-  if (els.memberAvatar) els.memberAvatar.src = '';
   if (els.rewardsList) {
     els.rewardsList.innerHTML = '<div class="empty-state">登入後可查看可兌換商品</div>';
   }
   if (els.redemptionList) {
     els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
   }
-  if (els.adminSearchResults) els.adminSearchResults.innerHTML = '';
-  if (els.nicknameInput) els.nicknameInput.value = '';
 }
 
 function renderRewards(rewards = []) {
   if (!els.rewardsList) return;
 
-  const topRewards = rewards.slice(0, 3);
+  const list = rewards.slice(0, 3);
 
-  if (!topRewards.length) {
-    els.rewardsList.innerHTML = `<div class="empty-state">目前沒有可兌換商品</div>`;
+  if (!list.length) {
+    els.rewardsList.innerHTML = '<div class="empty-state">目前沒有可兌換商品</div>';
     return;
   }
 
-  els.rewardsList.innerHTML = topRewards.map((reward) => {
-    const disabled = Number(reward.stock ?? 0) <= 0 ? 'disabled' : '';
+  els.rewardsList.innerHTML = list.map((reward) => {
     const imageUrl = reward.image_url || 'https://placehold.co/600x400?text=Reward';
+    const disabled = Number(reward.stock ?? 0) <= 0 ? 'disabled' : '';
 
     return `
       <div class="reward-card">
@@ -201,7 +186,7 @@ function renderRewards(rewards = []) {
 
   els.rewardsList.querySelectorAll('.redeem-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const rewardId = btn.getAttribute('data-reward-id');
+      const rewardId = Number(btn.dataset.rewardId);
       await redeemReward(rewardId);
     });
   });
@@ -211,7 +196,7 @@ function renderRedemptions(redemptions = []) {
   if (!els.redemptionList) return;
 
   if (!redemptions.length) {
-    els.redemptionList.innerHTML = `<div class="empty-state">登入後可查看兌換紀錄</div>`;
+    els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
     return;
   }
 
@@ -230,7 +215,7 @@ function renderLeaderboard(leaderboard = []) {
   if (!els.leaderboardList) return;
 
   if (!leaderboard.length) {
-    els.leaderboardList.innerHTML = `<div class="empty-state">目前還沒有排行榜資料</div>`;
+    els.leaderboardList.innerHTML = '<div class="empty-state">目前還沒有排行榜資料</div>';
     return;
   }
 
@@ -252,7 +237,7 @@ function renderAdminSearchResults(members = []) {
   if (!els.adminSearchResults) return;
 
   if (!members.length) {
-    els.adminSearchResults.innerHTML = `<div class="empty-state">找不到符合條件的會員</div>`;
+    els.adminSearchResults.innerHTML = '<div class="empty-state">找不到符合條件的會員</div>';
     return;
   }
 
@@ -265,17 +250,15 @@ function renderAdminSearchResults(members = []) {
           <div class="list-subtitle">${escapeHtml(member.id)}</div>
         </div>
       </div>
-      <button class="btn btn-secondary select-member-btn" data-member-id="${escapeHtml(member.id)}">
-        選取
-      </button>
+      <button class="btn btn-secondary select-member-btn" data-member-id="${escapeHtml(member.id)}">選取</button>
     </div>
   `).join('');
 
   els.adminSearchResults.querySelectorAll('.select-member-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const memberId = btn.getAttribute('data-member-id');
-      if (els.grantPointsMemberId) els.grantPointsMemberId.value = memberId || '';
-      if (els.deductPointsMemberId) els.deductPointsMemberId.value = memberId || '';
+      const memberId = btn.dataset.memberId || '';
+      if (els.grantPointsMemberId) els.grantPointsMemberId.value = memberId;
+      if (els.deductPointsMemberId) els.deductPointsMemberId.value = memberId;
       showMessage('已帶入會員 ID');
     });
   });
@@ -290,21 +273,12 @@ function renderDashboard(data) {
   if (els.loginBtn) els.loginBtn.style.display = 'none';
 
   const member = data.member || {};
-  if (els.memberName) {
-    els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
-  }
-  if (els.memberPoints) {
-    els.memberPoints.textContent = String(data.points ?? 0);
-  }
 
+  if (els.memberName) els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
+  if (els.memberPoints) els.memberPoints.textContent = String(data.points ?? 0);
   if (els.memberAvatar) {
-    els.memberAvatar.src =
-      member.avatar_url ||
-      member.picture_url ||
-      'https://placehold.co/96x96?text=User';
-    els.memberAvatar.alt = member.nickname || member.display_name || '會員頭像';
+    els.memberAvatar.src = member.avatar_url || member.picture_url || 'https://placehold.co/96x96?text=User';
   }
-
   if (els.nicknameInput) {
     els.nicknameInput.value = member.nickname || member.display_name || '';
   }
@@ -313,10 +287,8 @@ function renderDashboard(data) {
   renderRedemptions(data.redemptions || []);
   renderLeaderboard(data.leaderboard || []);
 
-  if (data.member?.is_admin) {
-    if (els.adminSection) els.adminSection.style.display = 'block';
-  } else {
-    if (els.adminSection) els.adminSection.style.display = 'none';
+  if (els.adminSection) {
+    els.adminSection.style.display = data.member?.is_admin ? 'block' : 'none';
   }
 }
 
@@ -338,7 +310,6 @@ async function bootstrapDashboard() {
 async function saveNickname() {
   try {
     clearMessage();
-
     const nickname = els.nicknameInput?.value?.trim();
     if (!nickname) throw new Error('請輸入暱稱');
 
@@ -354,14 +325,11 @@ async function saveNickname() {
 async function redeemReward(rewardId) {
   try {
     clearMessage();
-
-    if (!state.dashboard?.member?.id) {
-      throw new Error('尚未取得會員資料');
-    }
+    if (!state.dashboard?.member?.id) throw new Error('尚未取得會員資料');
 
     await callApi('redeem', {
       memberId: state.dashboard.member.id,
-      rewardId: Number(rewardId),
+      rewardId,
     });
 
     showMessage('兌換成功');
@@ -375,7 +343,6 @@ async function redeemReward(rewardId) {
 async function searchMembers() {
   try {
     clearMessage();
-
     const keyword = els.adminSearchInput?.value?.trim() || '';
     const data = await callApi('search_members', { keyword });
     renderAdminSearchResults(data.members || []);
@@ -397,12 +364,7 @@ async function grantPoints() {
     if (!points || points <= 0) throw new Error('請填入大於 0 的點數');
     if (!reason) throw new Error('請填入加點原因');
 
-    const result = await callApi('grant_points', {
-      memberId,
-      points,
-      reason,
-    });
-
+    const result = await callApi('grant_points', { memberId, points, reason });
     showMessage(result.message || '加點成功');
 
     if (els.grantPointsValue) els.grantPointsValue.value = '';
@@ -427,12 +389,7 @@ async function deductPoints() {
     if (!points || points <= 0) throw new Error('請填入大於 0 的扣點數');
     if (!reason) throw new Error('請填入扣點原因');
 
-    const result = await callApi('deduct_points', {
-      memberId,
-      points,
-      reason,
-    });
-
+    const result = await callApi('deduct_points', { memberId, points, reason });
     showMessage(result.message || '扣點成功');
 
     if (els.deductPointsValue) els.deductPointsValue.value = '';
@@ -449,12 +406,9 @@ async function signIn() {
   try {
     clearMessage();
 
+    const currentConfig = getConfig();
+    if (!currentConfig.liffId) throw new Error('config.js 尚未設定 liffId');
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
-
-    const currentConfig = window.APP_CONFIG || {};
-    if (!currentConfig.liffId) {
-      throw new Error('config.js 尚未設定 liffId');
-    }
 
     if (!liff.isLoggedIn()) {
       liff.login({ redirectUri: getCleanAppUrl() });
@@ -490,32 +444,16 @@ async function signOut() {
 }
 
 async function bootstrap() {
-  if (state.isBootstrapping) return;
-  state.isBootstrapping = true;
-
   clearMessage();
 
   try {
-    const currentConfig = window.APP_CONFIG || {};
+    const currentConfig = getConfig();
 
-    if (!currentConfig.liffId) {
-      if (state.bootstrapRetryCount < 10) {
-        state.bootstrapRetryCount += 1;
-        state.isBootstrapping = false;
-        setTimeout(() => {
-          bootstrap();
-        }, 150);
-        return;
-      }
-      throw new Error('config.js 尚未設定 liffId');
-    }
-
+    if (!currentConfig.liffId) throw new Error('config.js 尚未設定 liffId');
     if (!currentConfig.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
     if (!currentConfig.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
     if (!currentConfig.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
     if (!window.liff) throw new Error('LIFF SDK 尚未載入');
-
-    state.bootstrapRetryCount = 0;
 
     await liff.init({
       liffId: currentConfig.liffId,
@@ -543,7 +481,6 @@ async function bootstrap() {
     await loadPublicLeaderboard();
     showMessage(`初始化失敗：${normalizeError(error)}`, true);
   } finally {
-    state.isBootstrapping = false;
     if (els.appReady) els.appReady.style.display = 'block';
   }
 }
