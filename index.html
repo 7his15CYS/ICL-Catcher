@@ -12,7 +12,7 @@
       <div class="hero-content">
         <p class="eyebrow">會員中心</p>
         <h1>ICL 會員點數中心</h1>
-        <p class="hero-text">夾娃娃累積點數、查詢排行榜、兌換獎品，以及線上一番賞都在這裡完成。</p>
+        <p class="hero-text">夾娃娃累積點數、查詢排行榜與兌換獎品都在這裡完成。VIP 會員登入後才會顯示一番賞。</p>
       </div>
 
       <div class="hero-actions" id="auth-section">
@@ -33,6 +33,7 @@
 
         <div class="member-info">
           <h2 id="member-name">-</h2>
+          <div id="member-role-badge" class="member-role-badge">一般會員</div>
           <p class="points-label">目前點數</p>
           <div class="points-value"><span id="member-points">0</span> 點</div>
         </div>
@@ -64,12 +65,11 @@
       </div>
     </section>
 
-    <section class="card" id="ichiban-section">
+    <section class="card" id="ichiban-section" style="display:none;">
       <div class="section-header">
         <h2>線上一番賞</h2>
-        <a class="more-link" href="./ichiban.html">進入一番賞頁面 →</a>
+        <a class="more-link" id="ichiban-entry-link" href="./ichiban.html">進入一番賞頁面 →</a>
       </div>
-      <div id="ichiban-vip-gate" class="nickname-help" style="display:none; margin-bottom:12px;">此功能僅開放 VIP 會員。一般客人仍可正常使用點數與商品兌換。</div>
       <div id="ichiban-summary" class="list-wrap"></div>
     </section>
 
@@ -142,8 +142,8 @@
       </div>
 
       <div class="admin-block">
-        <h3>搜尋會員 / 設定會員身分</h3>
-        <p class="nickname-help">一般客人只能看到點數與兌換商品；VIP 才能看到一番賞。搜尋後可直接切換會員身分。</p>
+        <h3>搜尋會員</h3>
+        <p class="nickname-help">搜尋後可直接設定會員身分。一般會員只能看到點數與兌換商品；VIP 會員才看得到一番賞。</p>
         <div class="row">
           <input
             type="text"
