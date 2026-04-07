@@ -167,6 +167,11 @@ function renderLoggedOut() {
   if (els.rewardsList) els.rewardsList.innerHTML = '<div class="empty-state">登入後可查看可兌換商品</div>';
   if (els.redemptionList) els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
   if (els.ichibanSummary) els.ichibanSummary.innerHTML = '';
+  if (els.memberRoleBadge) {
+    els.memberRoleBadge.style.display = 'none';
+    els.memberRoleBadge.classList.remove('vip');
+    els.memberRoleBadge.textContent = '';
+  }
 }
 
 function renderRewards(rewards = []) {
@@ -358,8 +363,9 @@ function renderDashboard(data) {
   if (els.memberAvatar) els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
   if (els.nicknameInput) els.nicknameInput.value = member.nickname || member.display_name || '';
   if (els.memberRoleBadge) {
-    els.memberRoleBadge.textContent = isVip ? 'VIP 會員' : '一般會員';
+    els.memberRoleBadge.textContent = 'VIP 會員';
     els.memberRoleBadge.classList.toggle('vip', isVip);
+    els.memberRoleBadge.style.display = isVip ? 'inline-flex' : 'none';
   }
 
   renderRewards(data.rewards || []);
