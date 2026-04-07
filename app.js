@@ -37,6 +37,7 @@ const state = {
   accessToken: null,
   profile: null,
   dashboard: null,
+  pending: new Set(),
 };
 
 function getConfig() {
@@ -104,8 +105,41 @@ function hasLiffRedirectParams() {
   );
 }
 
+function makeRequestId(prefix) {
+  if (window.crypto?.randomUUID) {
+    return `${prefix}-${window.crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function setButtonLoading(button, isLoading, loadingText = '處理中...') {
+  if (!button) return;
+
+  if (!button.dataset.originalText) {
+    button.dataset.originalText = button.textContent || '';
+  }
+
+  button.disabled = isLoading;
+  button.classList.toggle('is-loading', isLoading);
+  button.textContent = isLoading ? loadingText : button.dataset.originalText;
+}
+
+function startPending(key) {
+  if (state.pending.has(key)) {
+    throw new Error('上一個操作尚未完成，請稍候');
+  }
+  state.pending.add(key);
+}
+
+function endPending(key) {
+  state.pending.delete(key);
+}
+
 async function callApi(action, payload = {}) {
   const config = getConfig();
+  if (!config.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
+  if (!config.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
+  if (!config.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
 
   const res = await fetch(`${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`, {
     method: 'POST',
@@ -163,7 +197,8 @@ function renderRewards(rewards = []) {
 
   els.rewardsList.innerHTML = list.map((reward) => {
     const imageUrl = reward.image_url || 'https://placehold.co/600x400?text=Reward';
-    const disabled = Number(reward.stock ?? 0) <= 0 ? 'disabled' : '';
+    const stock = Number(reward.stock ?? 0);
+    const disabled = stock <= 0 ? 'disabled' : '';
 
     return `
       <div class="reward-card">
@@ -174,10 +209,10 @@ function renderRewards(rewards = []) {
           <p>${escapeHtml(reward.description || '')}</p>
           <div class="reward-meta">
             <span>${escapeHtml(reward.points_cost)} 點</span>
-            <span>庫存 ${escapeHtml(reward.stock)}</span>
+            <span>庫存 ${escapeHtml(stock)}</span>
           </div>
-          <button class="btn btn-primary redeem-btn" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
-            ${Number(reward.stock ?? 0) > 0 ? '兌換' : '已無庫存'}
+          <button class="btn btn-primary redeem-btn" type="button" data-reward-id="${escapeHtml(reward.id)}" ${disabled}>
+            ${stock > 0 ? '兌換' : '已無庫存'}
           </button>
         </div>
       </div>
@@ -187,7 +222,7 @@ function renderRewards(rewards = []) {
   els.rewardsList.querySelectorAll('.redeem-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const rewardId = Number(btn.dataset.rewardId);
-      await redeemReward(rewardId);
+      await redeemReward(rewardId, btn);
     });
   });
 }
@@ -196,7 +231,7 @@ function renderRedemptions(redemptions = []) {
   if (!els.redemptionList) return;
 
   if (!redemptions.length) {
-    els.redemptionList.innerHTML = '<div class="empty-state">登入後可查看兌換紀錄</div>';
+    els.redemptionList.innerHTML = '<div class="empty-state">目前還沒有兌換紀錄</div>';
     return;
   }
 
@@ -247,10 +282,10 @@ function renderAdminSearchResults(members = []) {
         <img class="leaderboard-avatar" src="${escapeHtml(member.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(member.nickname || member.display_name)}">
         <div>
           <div class="list-title">${escapeHtml(member.nickname || member.display_name)}</div>
-          <div class="list-subtitle">${escapeHtml(member.id)}</div>
+          <div class="list-subtitle">ID：${escapeHtml(member.id)} ・ 目前 ${escapeHtml(member.current_points ?? 0)} 點</div>
         </div>
       </div>
-      <button class="btn btn-secondary select-member-btn" data-member-id="${escapeHtml(member.id)}">選取</button>
+      <button class="btn btn-secondary select-member-btn" type="button" data-member-id="${escapeHtml(member.id)}">選取</button>
     </div>
   `).join('');
 
@@ -308,8 +343,12 @@ async function bootstrapDashboard() {
 }
 
 async function saveNickname() {
+  const key = 'saveNickname';
   try {
+    startPending(key);
+    setButtonLoading(els.nicknameSaveBtn, true, '更新中...');
     clearMessage();
+
     const nickname = els.nicknameInput?.value?.trim();
     if (!nickname) throw new Error('請輸入暱稱');
 
@@ -319,17 +358,25 @@ async function saveNickname() {
   } catch (error) {
     console.error('saveNickname error =', error);
     showMessage(normalizeError(error, '暱稱更新失敗'), true);
+  } finally {
+    endPending(key);
+    setButtonLoading(els.nicknameSaveBtn, false);
   }
 }
 
-async function redeemReward(rewardId) {
+async function redeemReward(rewardId, button) {
+  const key = `redeem:${rewardId}`;
   try {
+    startPending(key);
+    setButtonLoading(button, true, '兌換中...');
     clearMessage();
+
     if (!state.dashboard?.member?.id) throw new Error('尚未取得會員資料');
 
     await callApi('redeem', {
       memberId: state.dashboard.member.id,
       rewardId,
+      requestId: makeRequestId('redeem'),
     });
 
     showMessage('兌換成功');
@@ -337,11 +384,17 @@ async function redeemReward(rewardId) {
   } catch (error) {
     console.error('redeemReward error =', error);
     showMessage(normalizeError(error, '兌換失敗'), true);
+  } finally {
+    endPending(key);
+    setButtonLoading(button, false);
   }
 }
 
 async function searchMembers() {
+  const key = 'searchMembers';
   try {
+    startPending(key);
+    setButtonLoading(els.adminSearchBtn, true, '搜尋中...');
     clearMessage();
     const keyword = els.adminSearchInput?.value?.trim() || '';
     const data = await callApi('search_members', { keyword });
@@ -349,11 +402,17 @@ async function searchMembers() {
   } catch (error) {
     console.error('searchMembers error =', error);
     showMessage(normalizeError(error, '搜尋會員失敗'), true);
+  } finally {
+    endPending(key);
+    setButtonLoading(els.adminSearchBtn, false);
   }
 }
 
 async function grantPoints() {
+  const key = 'grantPoints';
   try {
+    startPending(key);
+    setButtonLoading(els.grantPointsBtn, true, '加點中...');
     clearMessage();
 
     const memberId = els.grantPointsMemberId?.value?.trim();
@@ -361,10 +420,16 @@ async function grantPoints() {
     const reason = els.grantPointsReason?.value?.trim();
 
     if (!memberId) throw new Error('請先填入會員 ID');
-    if (!points || points <= 0) throw new Error('請填入大於 0 的點數');
+    if (!Number.isInteger(points) || points <= 0) throw new Error('請填入大於 0 的整數點數');
     if (!reason) throw new Error('請填入加點原因');
 
-    const result = await callApi('grant_points', { memberId, points, reason });
+    const result = await callApi('grant_points', {
+      memberId,
+      points,
+      reason,
+      requestId: makeRequestId('grant'),
+    });
+
     showMessage(result.message || '加點成功');
 
     if (els.grantPointsValue) els.grantPointsValue.value = '';
@@ -374,11 +439,17 @@ async function grantPoints() {
   } catch (error) {
     console.error('grantPoints error =', error);
     showMessage(normalizeError(error, '加點失敗'), true);
+  } finally {
+    endPending(key);
+    setButtonLoading(els.grantPointsBtn, false);
   }
 }
 
 async function deductPoints() {
+  const key = 'deductPoints';
   try {
+    startPending(key);
+    setButtonLoading(els.deductPointsBtn, true, '扣點中...');
     clearMessage();
 
     const memberId = els.deductPointsMemberId?.value?.trim();
@@ -386,10 +457,16 @@ async function deductPoints() {
     const reason = els.deductPointsReason?.value?.trim();
 
     if (!memberId) throw new Error('請先填入會員 ID');
-    if (!points || points <= 0) throw new Error('請填入大於 0 的扣點數');
+    if (!Number.isInteger(points) || points <= 0) throw new Error('請填入大於 0 的整數扣點數');
     if (!reason) throw new Error('請填入扣點原因');
 
-    const result = await callApi('deduct_points', { memberId, points, reason });
+    const result = await callApi('deduct_points', {
+      memberId,
+      points,
+      reason,
+      requestId: makeRequestId('deduct'),
+    });
+
     showMessage(result.message || '扣點成功');
 
     if (els.deductPointsValue) els.deductPointsValue.value = '';
@@ -399,6 +476,9 @@ async function deductPoints() {
   } catch (error) {
     console.error('deductPoints error =', error);
     showMessage(normalizeError(error, '扣點失敗'), true);
+  } finally {
+    endPending(key);
+    setButtonLoading(els.deductPointsBtn, false);
   }
 }
 
@@ -433,6 +513,7 @@ async function signOut() {
     state.accessToken = null;
     state.profile = null;
     state.dashboard = null;
+    state.pending.clear();
 
     renderLoggedOut();
     await loadPublicLeaderboard();
