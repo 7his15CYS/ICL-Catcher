@@ -12,7 +12,7 @@
       <div class="hero-content">
         <p class="eyebrow">線上一番賞</p>
         <h1>ICL Online Kuji</h1>
-        <p class="hero-text">從會員中心進入活動，用點數抽獎。抽獎期間活動會上鎖，避免別人同時搶抽。</p>
+        <p class="hero-text">從會員中心進入活動，用點數抽獎。進入活動後會暫時鎖定給你，點選籤紙確認後就直接抽，不用再移到上方按確認。</p>
       </div>
 
       <div class="hero-actions" id="auth-section">
@@ -66,11 +66,11 @@
         <div class="ticket-stage-head">
           <div>
             <h3>抽獎籤紙</h3>
-            <p class="nickname-help">先選 1 張，再按「決清に進む / 確認抽獎」。鎖定期間內其他人無法搶進來。</p>
+            <p class="nickname-help">直接點籤紙就會跳出確認視窗；抽完後結果會直接留在原位置。你留在頁面時活動會暫時鎖定給你，超過一段時間沒動作會自動解除。</p>
           </div>
-          <div class="ticket-toolbar">
+          <div class="ticket-toolbar ticket-toolbar-right">
             <span id="ichiban-lock-status" class="status-chip">未進入</span>
-            <button class="btn btn-primary" id="play-ichiban-btn" type="button" disabled>確認抽獎</button>
+            <span id="ichiban-lock-timer" class="status-chip idle">-</span>
           </div>
         </div>
         <div id="ticket-grid" class="ticket-grid"></div>
