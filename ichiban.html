@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ICL 線上一番賞</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="page" id="app-ready" style="display:block;">
+    <section class="hero-card">
+      <div class="hero-content">
+        <p class="eyebrow">線上一番賞</p>
+        <h1>ICL Online Kuji</h1>
+        <p class="hero-text">從會員中心進入活動，用點數抽獎。抽獎期間活動會上鎖，避免別人同時搶抽。</p>
+      </div>
+
+      <div class="hero-actions" id="auth-section">
+        <button class="btn btn-primary" id="login-btn" type="button">使用 LINE 登入</button>
+      </div>
+    </section>
+
+    <div class="message" id="message-box" style="display:none;"></div>
+
+    <section class="card" id="member-section" style="display:none;">
+      <div class="member-header">
+        <img id="member-avatar" class="member-avatar" src="https://placehold.co/96x96?text=User" alt="會員頭像" />
+        <div class="member-info">
+          <h2 id="member-name">-</h2>
+          <p class="points-label">目前點數</p>
+          <div class="points-value"><span id="member-points">0</span> 點</div>
+        </div>
+        <div class="member-actions">
+          <button class="btn btn-secondary" id="logout-btn" type="button" style="display:none;">登出</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-header">
+        <h2>活動列表</h2>
+        <a class="more-link" href="./index.html">← 回會員中心</a>
+      </div>
+      <div id="ichiban-event-list" class="reward-grid"></div>
+    </section>
+
+    <section class="card" id="ichiban-detail-section" style="display:none;">
+      <div class="section-header">
+        <h2 id="ichiban-detail-title">活動詳情</h2>
+        <div class="ticket-toolbar">
+          <button class="btn btn-secondary" id="refresh-ichiban-btn" type="button">重新整理</button>
+          <button class="btn btn-danger" id="leave-ichiban-btn" type="button">離開活動</button>
+        </div>
+      </div>
+
+      <div class="ichiban-hero">
+        <img id="ichiban-detail-image" class="ichiban-cover" src="https://placehold.co/1200x600?text=Ichiban" alt="一番賞活動封面" />
+        <div class="ichiban-hero-info">
+          <p id="ichiban-detail-description" class="hero-text"></p>
+          <div class="ichiban-stats" id="ichiban-detail-stats"></div>
+          <div class="ichiban-prize-list" id="ichiban-prize-list"></div>
+        </div>
+      </div>
+
+      <div class="ticket-stage-wrap">
+        <div class="ticket-stage-head">
+          <div>
+            <h3>抽獎籤紙</h3>
+            <p class="nickname-help">先選 1 張，再按「決清に進む / 確認抽獎」。鎖定期間內其他人無法搶進來。</p>
+          </div>
+          <div class="ticket-toolbar">
+            <span id="ichiban-lock-status" class="status-chip">未進入</span>
+            <button class="btn btn-primary" id="play-ichiban-btn" type="button" disabled>確認抽獎</button>
+          </div>
+        </div>
+        <div id="ticket-grid" class="ticket-grid"></div>
+      </div>
+    </section>
+
+    <section class="card" id="ichiban-history-section" style="display:none;">
+      <div class="section-header">
+        <h2>我的抽獎紀錄</h2>
+      </div>
+      <div id="ichiban-history-list" class="list-wrap"></div>
+    </section>
+  </main>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="./config.js"></script>
+  <script src="./ichiban.js"></script>
+</body>
+</html>
