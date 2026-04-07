@@ -1,4 +1,4 @@
-const config = window.APP_CONFIG || {};
+const config = window.APP_CONFIG;
 
 const els = {
   appReady: document.getElementById('app-ready'),
