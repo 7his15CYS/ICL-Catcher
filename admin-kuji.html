@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ICL 一番賞後台</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="page">
+    <section class="hero-card">
+      <div>
+        <p class="eyebrow">管理員後台</p>
+        <h1>一番賞活動管理</h1>
+        <p class="hero-text">建立草稿、設定獎項、上架活動、查看抽獎紀錄。</p>
+      </div>
+      <div class="hero-actions">
+        <a class="btn btn-secondary" href="./index.html">← 回會員中心</a>
+        <button class="btn btn-primary" id="login-btn" type="button">使用 LINE 登入</button>
+        <button class="btn btn-secondary" id="logout-btn" type="button" style="display:none;">登出</button>
+      </div>
+    </section>
+
+    <div id="message-box" class="message" style="display:none;"></div>
+
+    <section class="card" id="admin-only-section" style="display:none;">
+      <div class="section-header">
+        <h2>活動列表</h2>
+        <div class="section-actions">
+          <button class="btn btn-secondary" id="reload-campaigns-btn" type="button">重新整理</button>
+          <button class="btn btn-primary" id="new-draft-btn" type="button">新增草稿</button>
+        </div>
+      </div>
+      <div id="campaign-admin-list" class="list-wrap"></div>
+    </section>
+
+    <section class="card" id="editor-section" style="display:none;">
+      <div class="section-header">
+        <h2 id="editor-title">活動編輯</h2>
+        <div class="section-actions">
+          <button class="btn btn-primary" id="save-campaign-btn" type="button">儲存草稿</button>
+          <button class="btn btn-secondary" id="publish-campaign-btn" type="button">上架活動</button>
+          <button class="btn btn-warning" id="pause-campaign-btn" type="button">暫停</button>
+          <button class="btn btn-primary" id="activate-campaign-btn" type="button">恢復上架</button>
+          <button class="btn btn-danger" id="end-campaign-btn" type="button">結束活動</button>
+        </div>
+      </div>
+
+      <div class="form-grid two-col">
+        <input id="campaign-id" class="input" type="text" placeholder="活動 ID（自動帶入）" readonly />
+        <input id="campaign-title-input" class="input" type="text" placeholder="活動名稱" />
+        <input id="points-per-draw-input" class="input" type="number" min="1" placeholder="每抽點數" />
+        <input id="total-tickets-input" class="input" type="number" min="1" placeholder="總籤數" />
+        <input id="max-draw-input" class="input" type="number" min="1" placeholder="單次最多抽幾籤" />
+        <input id="reserve-seconds-input" class="input" type="number" min="1" placeholder="保留秒數" />
+        <input id="starts-at-input" class="input" type="datetime-local" />
+        <input id="ends-at-input" class="input" type="datetime-local" />
+        <input id="cover-image-input" class="input full-span" type="text" placeholder="封面圖片 URL" />
+      </div>
+      <textarea id="campaign-description-input" class="input textarea" placeholder="活動說明"></textarea>
+
+      <div class="section-header compact">
+        <h3>獎項設定</h3>
+        <button class="btn btn-secondary" id="add-prize-row-btn" type="button">新增獎項列</button>
+      </div>
+      <div id="prize-rows" class="prize-rows"></div>
+      <p class="muted">所有獎項數量加總必須等於總籤數。</p>
+    </section>
+
+    <section class="card" id="orders-section" style="display:none;">
+      <div class="section-header">
+        <h2>抽獎紀錄</h2>
+        <button class="btn btn-secondary" id="reload-orders-btn" type="button">重新整理紀錄</button>
+      </div>
+      <div id="orders-list" class="list-wrap"></div>
+    </section>
+
+    <section class="card" id="forbidden-section" style="display:none;">
+      <div class="empty-state">你不是管理員，無法使用這個頁面。</div>
+    </section>
+  </main>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="./config.js"></script>
+  <script src="./admin-kuji.js"></script>
+</body>
+</html>
