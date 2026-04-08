@@ -8,6 +8,10 @@ const state = {
   currentDetail: null,
   ticketWall: [],
   revealingTicketNo: null,
+  turnTimerId: null,
+  pollTimerId: null,
+  localTurn: null,
+  lastTurnStatusText: '',
 };
 const els = {
   loginBtn: document.getElementById('login-btn'),
@@ -33,6 +37,11 @@ const els = {
   refreshWallBtn: document.getElementById('refresh-wall-btn'),
   ticketWallSummary: document.getElementById('ticket-wall-summary'),
   ticketGrid: document.getElementById('ticket-grid'),
+  turnPanel: document.getElementById('turn-panel'),
+  turnStatusTitle: document.getElementById('turn-status-title'),
+  turnStatusText: document.getElementById('turn-status-text'),
+  turnCountdown: document.getElementById('turn-countdown'),
+  releaseTurnBtn: document.getElementById('release-turn-btn'),
 };
 
 function escapeHtml(v) { return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
@@ -53,12 +62,120 @@ function setKujiVisibility(allowed, message=''){
     els.accessDeniedText.textContent = message || '此頁面僅限 VIP 會員與管理員查看。';
   }
 }
+function stopTurnTimer(){ if(state.turnTimerId){ clearInterval(state.turnTimerId); state.turnTimerId=null; } }
+function stopPollTimer(){ if(state.pollTimerId){ clearInterval(state.pollTimerId); state.pollTimerId=null; } }
+function clearTurnState(){ stopTurnTimer(); state.localTurn=null; }
+function getLocalTurn(){
+  const turn = state.localTurn;
+  if(!turn) return null;
+  const expiresAt = turn.holder_expires_at ? new Date(turn.holder_expires_at).getTime() : 0;
+  const expired = !expiresAt || expiresAt <= Date.now();
+  const myId = state.member?.id ? String(state.member.id) : null;
+  const holderId = turn.holder_member_id ? String(turn.holder_member_id) : null;
+  return {
+    holder_member_id: holderId,
+    holder_nickname: turn.holder_nickname || null,
+    holder_expires_at: turn.holder_expires_at || null,
+    my_turn: Boolean(myId && holderId && myId === holderId && !expired),
+    occupied_by_other: Boolean(myId && holderId && myId !== holderId && !expired),
+    can_claim: !holderId || expired || (myId && holderId === myId),
+    is_expired: expired,
+    remaining_ms: expired ? 0 : Math.max(0, expiresAt - Date.now()),
+  };
+}
+function applyTurnFromDetail(detail){
+  const turn = detail?.turn || null;
+  const campaign = detail?.campaign || null;
+  if(!turn || !campaign){
+    state.localTurn = null;
+    return;
+  }
+  state.localTurn = {
+    holder_member_id: turn.holder_member_id ?? campaign.active_holder_member_id ?? null,
+    holder_nickname: turn.holder_nickname ?? null,
+    holder_expires_at: turn.holder_expires_at ?? campaign.active_holder_expires_at ?? null,
+  };
+}
+function applyTurnFromRevealResult(result){
+  const memberId = result?.holder_member_id ?? state.member?.id ?? null;
+  const currentNick = state.member?.nickname || state.member?.display_name || null;
+  state.localTurn = {
+    holder_member_id: memberId,
+    holder_nickname: currentNick,
+    holder_expires_at: result?.holder_expires_at || null,
+  };
+}
+function startTurnTimer(){
+  stopTurnTimer();
+  state.turnTimerId = window.setInterval(() => {
+    renderTurnPanel();
+    const turn = getLocalTurn();
+    if(!turn || turn.is_expired){
+      stopTurnTimer();
+      refreshCurrentCampaignState({ silent: true }).catch(() => {});
+    }
+  }, 1000);
+}
+function ensurePollTimer(){
+  stopPollTimer();
+  state.pollTimerId = window.setInterval(() => {
+    if(state.currentCampaignId && canAccessKuji(state.member) && !state.revealingTicketNo){
+      refreshCurrentCampaignState({ silent: true }).catch(() => {});
+    }
+  }, 5000);
+}
+function renderTurnPanel(){
+  if(!els.turnPanel) return;
+  const turn = getLocalTurn();
+  let panelClass = 'turn-panel waiting';
+  let title = '尚未鎖定回合';
+  let text = '點任何一張籤紙後，系統才會開始為你保留回合。';
+  let countdownText = '--';
+  let showRelease = false;
+
+  if(turn?.my_turn){
+    const seconds = Math.ceil(turn.remaining_ms / 1000);
+    panelClass = 'turn-panel mine';
+    title = '目前由你操作';
+    text = `你已取得回合保留時間。再次翻開下一張後，倒數會重新回到完整秒數。`;
+    countdownText = `${Math.max(0, seconds)} 秒`;
+    showRelease = true;
+  } else if(turn?.occupied_by_other){
+    const seconds = Math.ceil(turn.remaining_ms / 1000);
+    const holderName = turn.holder_nickname ? `會員 ${turn.holder_nickname}` : '其他會員';
+    panelClass = 'turn-panel locked';
+    title = '目前有人抽獎中';
+    text = `${holderName} 正在操作，請等待倒數結束或對方主動釋放回合。`;
+    countdownText = `${Math.max(0, seconds)} 秒`;
+  } else if(turn?.is_expired){
+    panelClass = 'turn-panel waiting';
+    title = '回合已釋放';
+    text = '上一位會員的保留時間已結束，現在任何人都可以點選籤紙。';
+    countdownText = '可點選';
+  }
+
+  els.turnPanel.className = panelClass;
+  els.turnStatusTitle.textContent = title;
+  els.turnStatusText.textContent = text;
+  els.turnCountdown.textContent = countdownText;
+  els.releaseTurnBtn.style.display = showRelease ? 'inline-flex' : 'none';
+}
+function canInteractTicket(ticket){
+  const turn = getLocalTurn();
+  const isBusy = state.revealingTicketNo === Number(ticket.ticket_no);
+  if(ticket.is_revealed || isBusy) return false;
+  if(!turn) return true;
+  if(turn.occupied_by_other) return false;
+  return true;
+}
 
 function renderMember(member, points){
   if(!member){
     els.memberSection.style.display='none';
     els.loginBtn.style.display='inline-flex';
     els.logoutBtn.style.display='none';
+    clearTurnState();
+    stopPollTimer();
     setKujiVisibility(false, '請先使用 LINE 登入，且帳號需為 VIP 會員或管理員，才能查看一番賞活動。');
     return;
   }
@@ -70,7 +187,10 @@ function renderMember(member, points){
   els.memberPoints.textContent=String(points ?? member.current_points ?? 0);
   if(canAccessKuji(member)){
     setKujiVisibility(true);
+    ensurePollTimer();
   }else{
+    clearTurnState();
+    stopPollTimer();
     setKujiVisibility(false, '你的帳號目前是一般會員，無法查看一番賞活動。請先由管理員將你設定為 VIP 會員。');
   }
 }
@@ -90,13 +210,8 @@ function renderPrizeList(prizes){
     ? list.map((p) => {
         const remaining = Number(p.remaining_quantity || 0);
         const total = Number(p.total_quantity || 0);
-
-        // 進度條改為顯示「已抽走比例」
         const drawn = Math.max(0, total - remaining);
-        const ratio = total > 0
-          ? Math.max(0, Math.min(100, Math.round((drawn / total) * 100)))
-          : 0;
-
+        const ratio = total > 0 ? Math.max(0, Math.min(100, Math.round((drawn / total) * 100))) : 0;
         const isSoldOut = total > 0 && remaining <= 0;
         const title = escapeHtml(p.prize_name || '未命名獎項');
         const code = escapeHtml(p.prize_code || '獎項');
@@ -143,10 +258,17 @@ function renderTicketWall(){
   const revealedCount = tickets.filter(t => t.is_revealed).length;
   const totalCount = tickets.length;
   const winningCount = tickets.filter(t => t.is_revealed && t.is_winning).length;
+  const turn = getLocalTurn();
 
-  els.ticketWallSummary.textContent = totalCount
+  let summary = totalCount
     ? `共 ${totalCount} 張籤紙，已翻開 ${revealedCount} 張，中獎 ${winningCount} 張。`
     : '目前沒有可顯示的籤紙。';
+  if(turn?.occupied_by_other){
+    summary += ' 目前由其他會員操作中。';
+  } else if(turn?.my_turn){
+    summary += ' 你目前持有操作回合。';
+  }
+  els.ticketWallSummary.textContent = summary;
 
   if(!totalCount){
     els.ticketGrid.innerHTML = '<div class="empty-state">目前沒有可顯示的籤紙</div>';
@@ -158,7 +280,8 @@ function renderTicketWall(){
     const classes = ['ticket-tile', 'direct-ticket-tile'];
     if(ticket.is_revealed) classes.push(ticket.is_winning ? 'revealed-win' : 'revealed-miss');
     if(isBusy) classes.push('is-loading');
-    return `<button class="${classes.join(' ')}" data-ticket-no="${escapeHtml(ticket.ticket_no)}" type="button" ${ticket.is_revealed || isBusy ? 'disabled' : ''}>${buildTicketInner(ticket)}</button>`;
+    if(!canInteractTicket(ticket)) classes.push('blocked');
+    return `<button class="${classes.join(' ')}" data-ticket-no="${escapeHtml(ticket.ticket_no)}" type="button" ${canInteractTicket(ticket) ? '' : 'disabled'}>${buildTicketInner(ticket)}</button>`;
   }).join('');
 
   els.ticketGrid.querySelectorAll('[data-ticket-no]').forEach(btn => {
@@ -175,6 +298,8 @@ function renderCurrentCampaign(){
   if(!detail){
     els.campaignEmpty.style.display='block';
     els.campaignDetail.style.display='none';
+    clearTurnState();
+    renderTurnPanel();
     return;
   }
 
@@ -192,6 +317,7 @@ function renderCurrentCampaign(){
     <div class="stat-chip">剩餘 ${Number(campaign.remaining_tickets||0)}</div>
     <div class="stat-chip">已開 ${Number(campaign.total_tickets||0) - Number(campaign.remaining_tickets||0)}</div>`;
   renderPrizeList(detail.prizes || []);
+  renderTurnPanel();
   renderTicketWall();
 }
 
@@ -236,6 +362,26 @@ async function loadTicketWall(){
   renderTicketWall();
 }
 
+async function refreshCurrentCampaignState({ silent=false } = {}){
+  if(!state.currentCampaignId || !canAccessKuji(state.member)) return;
+  const [detail, wall] = await Promise.all([
+    callApi('get_kuji_campaign_detail', { campaignId: state.currentCampaignId }, true),
+    callApi('get_kuji_ticket_wall', { campaignId: state.currentCampaignId }, true),
+  ]);
+  state.currentDetail = detail;
+  applyTurnFromDetail(detail);
+  state.ticketWall = wall.tickets || [];
+  if(detail?.campaign && wall?.campaign){
+    state.currentDetail.campaign = {
+      ...detail.campaign,
+      ...wall.campaign,
+    };
+  }
+  if(getLocalTurn()?.holder_expires_at) startTurnTimer(); else stopTurnTimer();
+  renderCurrentCampaign();
+  if(!silent) clearMessage();
+}
+
 async function openCampaign(campaignId, silent=false){
   if(!canAccessKuji(state.member)){
     setKujiVisibility(false, '你的帳號目前是一般會員，無法查看一番賞活動。請先由管理員將你設定為 VIP 會員。');
@@ -243,8 +389,9 @@ async function openCampaign(campaignId, silent=false){
   }
   state.currentCampaignId = campaignId;
   const detail = await callApi('get_kuji_campaign_detail', { campaignId }, true);
-  state.currentDetail = detail;
   const wall = await callApi('get_kuji_ticket_wall', { campaignId }, true);
+  state.currentDetail = detail;
+  applyTurnFromDetail(detail);
   state.ticketWall = wall.tickets || [];
   if(detail?.campaign && wall?.campaign) {
     detail.campaign = {
@@ -252,6 +399,7 @@ async function openCampaign(campaignId, silent=false){
       ...wall.campaign,
     };
   }
+  if(getLocalTurn()?.holder_expires_at) startTurnTimer(); else stopTurnTimer();
   renderCampaignList();
   renderCurrentCampaign();
   const url = new URL(window.location.href);
@@ -269,6 +417,11 @@ async function revealTicket(ticketNo){
     showMessage('只有 VIP 會員或管理員可以翻開一番賞籤紙', true);
     return;
   }
+  const currentTurn = getLocalTurn();
+  if(currentTurn?.occupied_by_other){
+    showMessage('目前由其他會員持有回合，請稍候再試。', true);
+    return;
+  }
   try{
     state.revealingTicketNo = ticketNo;
     renderTicketWall();
@@ -283,27 +436,45 @@ async function revealTicket(ticketNo){
       if(idx >= 0) state.ticketWall[idx] = result.ticket;
     }
     if(result.campaign && state.currentDetail?.campaign) state.currentDetail.campaign = result.campaign;
+    applyTurnFromRevealResult(result);
+    if(getLocalTurn()?.holder_expires_at) startTurnTimer();
     if(result.points != null && state.member){
       state.member.current_points = result.points;
       renderMember(state.member, result.points);
     } else {
       await loadDashboard();
     }
-    await loadTicketWall();
-    renderCurrentCampaign();
+    await refreshCurrentCampaignState({ silent: true });
     showMessage(result.message || '已翻開籤紙');
   }catch(error){
     showMessage(normalizeError(error, '翻開籤紙失敗'), true);
-    await loadTicketWall().catch(() => {});
-    renderCurrentCampaign();
+    await refreshCurrentCampaignState({ silent: true }).catch(() => {});
   }finally{
     state.revealingTicketNo = null;
     renderTicketWall();
   }
 }
 
+async function releaseCurrentTurn(){
+  if(!state.currentCampaignId || !state.member?.id) return;
+  const turn = getLocalTurn();
+  if(!turn?.my_turn) return;
+  try{
+    setButtonLoading(els.releaseTurnBtn, true, '釋放中...');
+    clearMessage();
+    const result = await callApi('release_kuji_turn', { campaignId: state.currentCampaignId }, true);
+    clearTurnState();
+    await refreshCurrentCampaignState({ silent: true });
+    showMessage(result.message || '已釋放抽籤控制權');
+  }catch(error){
+    showMessage(normalizeError(error, '釋放回合失敗'), true);
+  }finally{
+    setButtonLoading(els.releaseTurnBtn, false);
+  }
+}
+
 async function signIn(){ if(!liff.isLoggedIn()){ liff.login({redirectUri:getCleanAppUrl()}); return; } await bootstrap(); }
-async function signOut(){ if(window.liff && liff.isLoggedIn()) liff.logout(); state.accessToken=null; state.member=null; state.campaigns=[]; state.currentCampaignId=null; state.currentDetail=null; state.ticketWall=[]; renderMember(null); els.campaignList.innerHTML=''; renderCurrentCampaign(); showMessage('已登出'); }
+async function signOut(){ if(window.liff && liff.isLoggedIn()) liff.logout(); stopPollTimer(); clearTurnState(); state.accessToken=null; state.member=null; state.campaigns=[]; state.currentCampaignId=null; state.currentDetail=null; state.ticketWall=[]; renderMember(null); els.campaignList.innerHTML=''; renderCurrentCampaign(); showMessage('已登出'); }
 
 async function bootstrap(){
   try{
@@ -327,5 +498,6 @@ async function bootstrap(){
 els.loginBtn?.addEventListener('click', signIn);
 els.logoutBtn?.addEventListener('click', signOut);
 els.refreshCampaignsBtn?.addEventListener('click', ()=>loadCampaigns().catch(e=>showMessage(normalizeError(e,'刷新活動失敗'),true)));
-els.refreshWallBtn?.addEventListener('click', ()=>loadTicketWall().catch(e=>showMessage(normalizeError(e,'刷新籤紙失敗'),true)));
+els.refreshWallBtn?.addEventListener('click', ()=>refreshCurrentCampaignState({ silent: true }).catch(e=>showMessage(normalizeError(e,'刷新籤紙失敗'),true)));
+els.releaseTurnBtn?.addEventListener('click', ()=>releaseCurrentTurn());
 bootstrap();
