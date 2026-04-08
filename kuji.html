@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ICL 線上一番賞</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="page">
+    <section class="hero-card">
+      <div>
+        <p class="eyebrow">線上一番賞</p>
+        <h1>ICL 線上一番賞</h1>
+        <p class="hero-text">先取得抽籤回合，再決定要抽幾籤。回合倒數內，別人不能搶你的抽籤權。</p>
+      </div>
+      <div class="hero-actions">
+        <a class="btn btn-secondary" href="./index.html">← 回會員中心</a>
+        <button class="btn btn-primary" id="login-btn" type="button">使用 LINE 登入</button>
+        <button class="btn btn-secondary" id="logout-btn" type="button" style="display:none;">登出</button>
+      </div>
+    </section>
+
+    <div id="message-box" class="message" style="display:none;"></div>
+
+    <section class="card" id="member-section" style="display:none;">
+      <div class="member-header compact-header">
+        <img id="member-avatar" class="member-avatar" src="https://placehold.co/96x96?text=User" alt="會員頭像" />
+        <div class="member-info">
+          <h2 id="member-name">-</h2>
+          <p class="points-label">目前點數</p>
+          <div class="points-value"><span id="member-points">0</span> 點</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="section-header">
+        <h2>活動列表</h2>
+        <button class="btn btn-secondary" id="refresh-campaigns-btn" type="button">重新整理</button>
+      </div>
+      <div id="campaign-list" class="reward-grid"></div>
+    </section>
+
+    <section class="card" id="campaign-detail-section" style="display:none;">
+      <div class="section-header">
+        <h2 id="campaign-title">-</h2>
+        <div class="section-actions">
+          <button class="btn btn-primary" id="claim-turn-btn" type="button">開始抽籤</button>
+          <button class="btn btn-secondary" id="release-turn-btn" type="button">放棄本回合</button>
+        </div>
+      </div>
+
+      <img id="campaign-image" class="hero-image" src="https://placehold.co/1200x600?text=KUJI" alt="活動圖片" />
+      <p id="campaign-description" class="hero-text">-</p>
+
+      <div class="stats-grid" id="campaign-stats"></div>
+
+      <div class="status-panel">
+        <div>
+          <div class="status-title">目前狀態</div>
+          <div id="turn-status" class="status-chip idle">尚未讀取</div>
+        </div>
+        <div>
+          <div class="status-title">回合倒數</div>
+          <div id="turn-countdown" class="status-chip idle">-</div>
+        </div>
+      </div>
+
+      <div class="draw-panel">
+        <label class="field-label" for="draw-count-input">這次要抽幾籤</label>
+        <div class="row">
+          <input id="draw-count-input" class="input small-input" type="number" min="1" value="1" />
+          <button class="btn btn-primary" id="draw-btn" type="button">正式抽籤</button>
+          <button class="btn btn-secondary" id="refresh-detail-btn" type="button">更新狀態</button>
+        </div>
+        <p class="muted">只有在你持有本回合時才能抽。按下正式抽籤才會檢查點數並真正抽票。</p>
+      </div>
+
+      <div class="two-col-grid">
+        <div>
+          <h3>獎項剩餘</h3>
+          <div id="prize-list" class="list-wrap"></div>
+        </div>
+        <div>
+          <h3>我的抽獎結果</h3>
+          <div id="result-list" class="list-wrap"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="./config.js"></script>
+  <script src="./kuji.js"></script>
+</body>
+</html>
