@@ -173,7 +173,7 @@ function stopLockTimers() {
 function updateLockStatusUi() {
   const lock = state.currentEvent?.lock_status;
   if (!lock) {
-    els.lockStatus.textContent = '未進入';
+    els.lockStatus.textContent = '尚未進入活動';
     els.lockStatus.className = 'status-chip idle';
     els.lockTimer.textContent = '-';
     els.lockTimer.className = 'status-chip idle';
@@ -181,7 +181,7 @@ function updateLockStatusUi() {
   }
 
   if (lock.is_locked && lock.is_mine) {
-    els.lockStatus.textContent = '你已鎖定活動，可直接點籤抽獎';
+    els.lockStatus.textContent = '你正在抽獎中，其他客人暫時無法搶籤';
     els.lockStatus.className = 'status-chip busy';
     const remain = getRemainingLockSeconds();
     els.lockTimer.textContent = remain > 0 ? `鎖定倒數 ${remain}s` : '鎖定已到期';
@@ -190,17 +190,17 @@ function updateLockStatusUi() {
   }
 
   if (lock.is_locked && !lock.is_mine) {
-    els.lockStatus.textContent = `鎖定中：${lock.locked_by_display_name || '其他玩家'}`;
+    els.lockStatus.textContent = `目前有人抽獎中：${lock.locked_by_display_name || '其他玩家'}`;
     els.lockStatus.className = 'status-chip busy';
     const remain = getRemainingLockSeconds();
-    els.lockTimer.textContent = remain > 0 ? `約 ${remain}s 後可進入` : '可重新整理';
+    els.lockTimer.textContent = remain > 0 ? `約 ${remain}s 後可抽` : '可重新整理';
     els.lockTimer.className = 'status-chip idle';
     return;
   }
 
-  els.lockStatus.textContent = '目前未鎖定';
+  els.lockStatus.textContent = '尚未開始抽獎';
   els.lockStatus.className = 'status-chip idle';
-  els.lockTimer.textContent = '可直接抽獎';
+  els.lockTimer.textContent = '選好籤紙並確認後，才會開始鎖定';
   els.lockTimer.className = 'status-chip idle';
 }
 
@@ -292,23 +292,19 @@ function renderTickets(tickets) {
   els.ticketGrid.querySelectorAll('.ticket-tile:not(.drawn)').forEach((btn) => {
     btn.addEventListener('click', async () => {
       if (!state.currentEventId || !state.currentEvent) return;
-      if (!state.currentEvent.lock_status?.is_mine) {
-        showMessage('請先取得活動鎖定後再抽。', true);
-        return;
-      }
 
-      try {
-        await extendMyLock('select-ticket');
-      } catch (error) {
-        showMessage(normalizeError(error, '鎖定已失效，請重新進入活動'), true);
+      const lock = state.currentEvent.lock_status;
+      if (lock?.is_locked && !lock?.is_mine) {
+        showMessage(`目前 ${lock.locked_by_display_name || '其他玩家'} 正在抽獎，請稍候再試。`, true);
         await refreshEvent();
         return;
       }
 
       const ticketNo = btn.dataset.ticketNo || '';
-      const ok = window.confirm(`確定抽 ${ticketNo} 號籤嗎？\n本次會扣除 ${state.currentEvent.point_cost} 點。`);
+      const ok = window.confirm(`確定抽 ${ticketNo} 號籤嗎？
+本次會扣除 ${state.currentEvent.point_cost} 點。`);
       if (!ok) {
-        showMessage('已取消抽獎，你的活動鎖定仍保留。');
+        showMessage('已取消抽獎。');
         return;
       }
       await playIchiban(btn.dataset.ticketId);
@@ -361,9 +357,8 @@ async function enterEvent(eventId) {
   try {
     startPending(key);
     clearMessage();
-    await callApi('acquire_ichiban_lock', { eventId });
     await openEvent(eventId, { silent: true });
-    showMessage('已進入活動，現在可以直接點籤紙抽獎。');
+    showMessage('已進入活動，選好籤紙後直接點選抽獎；真正開始抽時才會鎖定。');
   } catch (error) {
     showMessage(normalizeError(error, '進入活動失敗'), true);
   } finally {
@@ -485,7 +480,7 @@ async function bootstrap() {
 
     if (state.currentEventId && isVipMember()) {
       try {
-        await enterEvent(state.currentEventId);
+        await openEvent(state.currentEventId, { silent: true });
       } catch {
         await refreshEvent();
       }
