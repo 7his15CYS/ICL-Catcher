@@ -1070,3 +1070,43 @@ h3 {
     font-size: 14px;
   }
 }
+
+
+.member-role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  margin: 2px 0 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #d8e1ec;
+  background: #f2f6fb;
+  color: #5f7690;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+.member-role-badge.vip {
+  border-color: #a97e1b;
+  background: linear-gradient(180deg, #f3dd8b 0%, #cfa139 100%);
+  color: #5b4208;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 248, 210, 0.9),
+    0 2px 4px rgba(91, 66, 8, 0.12);
+}
+
+.member-role-badge .vip-star {
+  font-size: 1.1em;
+  color: #6a4c09;
+  transform: translateY(-0.5px);
+}
+
+.member-role-badge .vip-text {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
