@@ -1,191 +1,116 @@
-const els = {
-  authSection: document.getElementById('auth-section'),
-  loginBtn: document.getElementById('login-btn'),
-  logoutBtn: document.getElementById('logout-btn'),
-  messageBox: document.getElementById('message-box'),
-  memberSection: document.getElementById('member-section'),
-  memberName: document.getElementById('member-name'),
-  memberAvatar: document.getElementById('member-avatar'),
-  memberPoints: document.getElementById('member-points'),
-  memberRoleBadge: document.getElementById('member-role-badge'),
-  nicknameInput: document.getElementById('nickname-input'),
-  nicknameSaveBtn: document.getElementById('nickname-save-btn'),
-  rewardsList: document.getElementById('rewards-list'),
-  redemptionList: document.getElementById('redemption-list'),
-  leaderboardList: document.getElementById('leaderboard-list'),
-  ichibanSection: document.getElementById('ichiban-section'),
-  ichibanSummary: document.getElementById('ichiban-summary'),
-  adminSection: document.getElementById('admin-section'),
-};
-
-const state = { accessToken: null, dashboard: null, pending: new Set() };
-function getConfig() { return window.APP_CONFIG || {}; }
-function normalizeError(err, fallback = '發生錯誤') {
-  if (err == null) return fallback;
-  if (typeof err === 'string') return err;
-  if (err instanceof Error) return err.message || fallback;
-  if (typeof err === 'object') return err.message || err.error || fallback;
-  return String(err);
-}
-function escapeHtml(value) {
-  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
-}
-function showMessage(message, isError = false) {
-  const text = typeof message === 'string' ? message : normalizeError(message);
-  if (!text) { els.messageBox.style.display = 'none'; return; }
-  els.messageBox.textContent = text;
-  els.messageBox.style.display = 'block';
-  els.messageBox.className = isError ? 'message error' : 'message success';
-}
-function clearMessage() { showMessage(''); }
-function setButtonLoading(button, isLoading, loadingText = '處理中...') {
-  if (!button) return;
-  if (!button.dataset.originalText) button.dataset.originalText = button.textContent || '';
-  button.disabled = isLoading;
-  button.textContent = isLoading ? loadingText : button.dataset.originalText;
-}
-function startPending(key) { if (state.pending.has(key)) throw new Error('上一個操作尚未完成'); state.pending.add(key); }
-function endPending(key) { state.pending.delete(key); }
-function getCleanAppUrl() { return `${window.location.origin}${window.location.pathname}`; }
-function hasLiffRedirectParams() {
-  const url = new URL(window.location.href);
-  return url.searchParams.has('code') || url.searchParams.has('state') || url.searchParams.has('liffClientId') || url.searchParams.has('liffRedirectUri');
-}
-
-async function callApi(action, payload = {}) {
-  const config = getConfig();
-  const res = await fetch(`${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: config.supabaseAnonKey },
-    body: JSON.stringify({ action, accessToken: state.accessToken, ...payload }),
-  });
-  const text = await res.text();
-  let data = {};
-  try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
-  if (!res.ok || data.ok === false) throw data;
-  return data;
-}
-
-function renderRewards(rewards) {
-  if (!rewards.length) { els.rewardsList.innerHTML = '<div class="empty-state">目前沒有可兌換獎品</div>'; return; }
-  els.rewardsList.innerHTML = rewards.map((reward) => `
-    <article class="reward-card">
-      <img class="reward-image" src="${escapeHtml(reward.image_url || 'https://placehold.co/600x400?text=Reward')}" alt="${escapeHtml(reward.name)}">
-      <div class="reward-body">
-        <span class="reward-category">${escapeHtml(reward.category || '兌換商品')}</span>
-        <h3>${escapeHtml(reward.name)}</h3>
-        <p>${escapeHtml(reward.description || '暫無說明')}</p>
-        <div class="reward-meta"><span>${escapeHtml(reward.points_cost)} 點</span><span>庫存 ${escapeHtml(reward.stock)}</span></div>
-        <a class="btn btn-secondary" href="./shop.html">前往兌換</a>
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ICL 管理後台</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="page admin-page">
+    <section class="hero-card compact-hero">
+      <div class="hero-content">
+        <p class="eyebrow">管理後台</p>
+        <h1>會員點數與一番賞管理</h1>
+        <p class="hero-text">搜尋會員、加點 / 扣點、建立草稿、上架活動與查看抽獎紀錄都在這裡。</p>
       </div>
-    </article>`).join('');
-}
-
-function renderRedemptions(redemptions) {
-  if (!redemptions.length) { els.redemptionList.innerHTML = '<div class="empty-state">你還沒有兌換紀錄</div>'; return; }
-  els.redemptionList.innerHTML = redemptions.map((item) => `
-    <div class="list-item">
-      <div>
-        <div class="list-title">${escapeHtml(item.reward_name)}</div>
-        <div class="list-subtitle">${new Date(item.created_at).toLocaleString('zh-TW')} ・ 狀態：${escapeHtml(item.status)}</div>
+      <div class="hero-actions" id="auth-section">
+        <button class="btn btn-primary" id="login-btn" type="button">使用 LINE 登入</button>
+        <a class="btn btn-secondary" href="./index.html">返回會員中心</a>
       </div>
-      <div class="list-points">-${escapeHtml(item.points_spent)} 點</div>
-    </div>`).join('');
-}
+    </section>
 
-function renderLeaderboard(list) {
-  if (!list.length) { els.leaderboardList.innerHTML = '<div class="empty-state">目前沒有排行榜資料</div>'; return; }
-  els.leaderboardList.innerHTML = list.map((item, index) => `
-    <div class="list-item leaderboard-item">
-      <div class="leaderboard-left">
-        <div class="leaderboard-rank">#${index + 1}</div>
-        <img class="leaderboard-avatar" src="${escapeHtml(item.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(item.display_name)}">
-        <div class="list-title">${escapeHtml(item.display_name)}</div>
+    <div class="message" id="message-box" style="display:none;"></div>
+
+    <section class="card admin-topbar" id="member-section" style="display:none;">
+      <div class="member-header compact-member-header">
+        <img id="member-avatar" class="member-avatar" src="https://placehold.co/96x96?text=User" alt="會員頭像" />
+        <div class="member-info">
+          <h2 id="member-name">-</h2>
+          <div class="member-role-badge vip">管理員</div>
+        </div>
+        <div class="member-actions"><button class="btn btn-secondary" id="logout-btn" type="button">登出</button></div>
       </div>
-      <div class="list-points">${escapeHtml(item.points)} 點</div>
-    </div>`).join('');
-}
+    </section>
 
-function renderIchibanSummary(events) {
-  if (!events.length) { els.ichibanSummary.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>'; return; }
-  els.ichibanSummary.innerHTML = events.map((event) => `
-    <div class="list-item list-item-stack">
-      <div>
-        <div class="list-title">${escapeHtml(event.title)}</div>
-        <div class="list-subtitle">${escapeHtml(event.points_per_draw ?? event.point_cost)} 點 / 抽 ・ 剩餘 ${escapeHtml(event.remaining_tickets)} / ${escapeHtml(event.total_tickets)} 張</div>
-      </div>
-      <a class="btn btn-primary" href="./ichiban.html?campaignId=${encodeURIComponent(event.id)}">進入活動</a>
-    </div>`).join('');
-}
+    <div class="admin-layout" id="admin-layout" style="display:none;">
+      <section class="card admin-sidebar-card">
+        <div class="section-header"><h2>活動列表</h2><button class="btn btn-primary" id="new-campaign-btn" type="button">新增草稿</button></div>
+        <button class="btn btn-secondary admin-sidebar-refresh" id="refresh-campaigns-btn" type="button">刷新</button>
+        <div id="campaign-list" class="list-wrap"></div>
+      </section>
 
-function renderDashboard(data) {
-  state.dashboard = data;
-  const member = data.member || {};
-  const roleLabel = member.is_admin ? '管理員' : (member.member_role === 'vip' ? 'VIP 會員' : '一般會員');
-  els.authSection.style.display = 'none';
-  els.memberSection.style.display = 'block';
-  els.logoutBtn.style.display = 'inline-flex';
-  els.loginBtn.style.display = 'none';
-  els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
-  els.memberPoints.textContent = String(data.points ?? 0);
-  els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
-  els.nicknameInput.value = member.nickname || member.display_name || '';
-  els.memberRoleBadge.style.display = 'inline-flex';
-  els.memberRoleBadge.textContent = roleLabel;
-  els.memberRoleBadge.className = 'member-role-badge';
-  if (member.is_admin || member.member_role === 'vip') els.memberRoleBadge.classList.add('vip');
-  els.ichibanSection.style.display = (member.is_admin || member.member_role === 'vip') ? 'block' : 'none';
-  els.adminSection.style.display = member.is_admin ? 'block' : 'none';
-  renderRewards(data.rewards || []);
-  renderRedemptions(data.redemptions || []);
-  renderLeaderboard(data.leaderboard || []);
-  if (member.is_admin || member.member_role === 'vip') renderIchibanSummary(data.ichiban_events || []);
-}
+      <section class="card admin-main-card">
+        <div class="admin-card-header">
+          <h2 id="editor-title">新增草稿</h2>
+          <span class="status-pill" id="campaign-status-pill">draft</span>
+        </div>
+        <div class="form-grid two-col">
+          <input type="text" id="campaign-id" class="input" placeholder="活動 ID（新增時留空）" readonly />
+          <input type="text" id="campaign-title" class="input" placeholder="活動名稱" />
+          <input type="number" id="points-per-draw" class="input" placeholder="單抽點數" min="1" step="1" />
+          <input type="number" id="total-tickets" class="input" placeholder="總籤數" min="1" step="1" />
+          <input type="number" id="max-draw-per-order" class="input" placeholder="單次最多抽數" min="1" step="1" />
+          <input type="number" id="turn-hold-seconds" class="input" placeholder="保留秒數" min="1" step="1" />
+          <input type="text" id="cover-image-url" class="input" placeholder="封面圖片 URL" />
+          <input type="datetime-local" id="starts-at" class="input" />
+          <input type="datetime-local" id="ends-at" class="input" />
+        </div>
+        <textarea id="campaign-description" class="input textarea" placeholder="活動說明"></textarea>
 
-async function saveNickname() {
-  const key = 'saveNickname';
-  try {
-    startPending(key); setButtonLoading(els.nicknameSaveBtn, true, '更新中...'); clearMessage();
-    const nickname = els.nicknameInput.value.trim();
-    if (!nickname) throw new Error('請輸入暱稱');
-    const result = await callApi('update_nickname', { nickname });
-    showMessage(result.message || '暱稱更新成功');
-    renderDashboard(result);
-  } catch (error) {
-    showMessage(normalizeError(error, '暱稱更新失敗'), true);
-  } finally {
-    endPending(key); setButtonLoading(els.nicknameSaveBtn, false);
-  }
-}
+        <div class="admin-subcard">
+          <div class="section-header"><h3>獎項設定</h3><button class="btn btn-secondary" id="add-prize-row-btn" type="button">新增獎項列</button></div>
+          <div id="prize-rows" class="prize-rows"></div>
+          <p class="nickname-tip" id="prize-summary">獎項總數 0，總籤數 0，兩者必須相等。</p>
+        </div>
 
-async function bootstrapDashboard() { const data = await callApi('login'); renderDashboard(data); }
-async function signIn() {
-  if (!liff.isLoggedIn()) { liff.login({ redirectUri: getCleanAppUrl() }); return; }
-  await bootstrap();
-}
-function signOut() {
-  if (window.liff && liff.isLoggedIn()) liff.logout();
-  state.accessToken = null; state.dashboard = null;
-  els.authSection.style.display = 'block'; els.memberSection.style.display = 'none'; els.logoutBtn.style.display = 'none'; els.loginBtn.style.display = 'inline-flex'; els.ichibanSection.style.display = 'none'; els.adminSection.style.display = 'none';
-  showMessage('已登出');
-}
-async function bootstrap() {
-  try {
-    const config = getConfig();
-    if (!config.liffId || !config.supabaseUrl || !config.supabaseAnonKey || !config.apiFunctionName) throw new Error('請先設定 config.js');
-    await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: false });
-    if (!liff.isLoggedIn()) {
-      if (hasLiffRedirectParams()) {
-        const url = new URL(window.location.href); ['code','state','liffClientId','liffRedirectUri'].forEach((k)=>url.searchParams.delete(k)); window.history.replaceState({}, document.title, url.toString());
-      }
-      return;
-    }
-    state.accessToken = liff.getAccessToken();
-    await bootstrapDashboard();
-  } catch (error) { showMessage(normalizeError(error, '初始化失敗'), true); }
-}
+        <div class="admin-action-row wrap-row">
+          <button class="btn btn-primary" id="save-campaign-btn" type="button">儲存草稿</button>
+          <button class="btn btn-secondary" id="publish-campaign-btn" type="button">上架活動</button>
+          <button class="btn btn-secondary" id="pause-campaign-btn" type="button">暫停</button>
+          <button class="btn btn-secondary" id="resume-campaign-btn" type="button">恢復上架</button>
+          <button class="btn btn-danger" id="end-campaign-btn" type="button">結束活動</button>
+        </div>
 
-els.loginBtn?.addEventListener('click', signIn);
-els.logoutBtn?.addEventListener('click', signOut);
-els.nicknameSaveBtn?.addEventListener('click', saveNickname);
-bootstrap();
+        <div class="admin-subcard">
+          <div class="section-header"><h3>抽獎紀錄</h3><button class="btn btn-secondary" id="refresh-orders-btn" type="button">刷新紀錄</button></div>
+          <div id="order-list" class="list-wrap"></div>
+        </div>
+      </section>
+
+      <section class="card admin-right-card">
+        <div class="section-header"><h2>會員管理</h2></div>
+        <div class="row">
+          <input type="text" id="member-search-input" class="input" placeholder="輸入會員名稱或暱稱" />
+          <button class="btn btn-secondary" id="member-search-btn" type="button">搜尋</button>
+        </div>
+        <div id="member-search-results" class="list-wrap"></div>
+
+        <div class="admin-subcard">
+          <h3>手動加點</h3>
+          <div class="form-grid single-col">
+            <input type="text" id="grant-member-id" class="input" placeholder="會員 ID" />
+            <input type="number" id="grant-points" class="input" placeholder="加點點數" min="1" step="1" />
+            <input type="text" id="grant-reason" class="input" placeholder="加點原因" maxlength="100" />
+          </div>
+          <button class="btn btn-primary" id="grant-points-btn" type="button">確認加點</button>
+        </div>
+
+        <div class="admin-subcard">
+          <h3>手動扣點</h3>
+          <div class="form-grid single-col">
+            <input type="text" id="deduct-member-id" class="input" placeholder="會員 ID" />
+            <input type="number" id="deduct-points" class="input" placeholder="扣點點數" min="1" step="1" />
+            <input type="text" id="deduct-reason" class="input" placeholder="扣點原因" maxlength="100" />
+          </div>
+          <button class="btn btn-danger" id="deduct-points-btn" type="button">確認扣點</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  <script src="./config.js"></script>
+  <script src="./admin-kuji.js"></script>
+</body>
+</html>
