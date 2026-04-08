@@ -12,7 +12,7 @@
       <div>
         <p class="eyebrow">線上一番賞</p>
         <h1>ICL 線上一番賞</h1>
-        <p class="hero-text">進入活動後會直接看到全部籤紙。點任何一張就會直接翻開結果：未中獎顯示黑底白字，中獎顯示金底黑字。</p>
+        <p class="hero-text">進入活動後會直接看到全部籤紙。當你點選任一張籤紙並看到結果後，系統會開始保留倒數；倒數內可繼續翻下一張，或主動退出讓出回合。</p>
       </div>
       <div class="header-actions">
         <button id="login-btn" class="btn btn-primary" type="button">使用 LINE 登入</button>
@@ -56,10 +56,6 @@
             <div>
               <p id="campaign-description" class="muted"></p>
               <div id="campaign-stats" class="ichiban-stats"></div>
-              <div class="ticket-toolbar ticket-toolbar-top">
-                <div class="ticket-tip">直接點選任一張籤紙即可翻開。已翻開的籤會保留結果。</div>
-                <button id="refresh-wall-btn" class="btn btn-secondary" type="button">重新整理籤紙</button>
-              </div>
             </div>
           </div>
 
@@ -69,7 +65,22 @@
                 <h3>抽獎籤紙</h3>
                 <p id="ticket-wall-summary" class="muted">載入中...</p>
               </div>
+              <div class="ticket-toolbar ticket-toolbar-right">
+                <button id="refresh-wall-btn" class="btn btn-secondary" type="button">重新整理籤紙</button>
+              </div>
             </div>
+
+            <div id="turn-panel" class="turn-panel waiting">
+              <div class="turn-panel-main">
+                <div id="turn-status-title" class="turn-status-title">尚未鎖定回合</div>
+                <div id="turn-status-text" class="turn-status-text">點任何一張籤紙後，系統才會開始為你保留回合。</div>
+              </div>
+              <div class="turn-panel-side">
+                <div id="turn-countdown" class="turn-countdown">--</div>
+                <button id="release-turn-btn" class="btn btn-danger" type="button" style="display:none;">退出並釋放回合</button>
+              </div>
+            </div>
+
             <div id="ticket-grid" class="ticket-grid direct-ticket-grid"></div>
           </section>
 
