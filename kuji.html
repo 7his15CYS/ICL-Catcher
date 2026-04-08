@@ -12,7 +12,7 @@
       <div>
         <p class="eyebrow">線上一番賞</p>
         <h1>ICL 線上一番賞</h1>
-        <p class="hero-text">先取得本活動的抽籤回合，再決定要抽幾張。倒數內只有你能繼續下一抽。</p>
+        <p class="hero-text">先取得本活動的抽籤回合，再決定要抽幾張。正式抽籤後會一次產生對應數量的籤紙，會員可逐張點開查看結果。</p>
       </div>
       <div class="header-actions">
         <button id="login-btn" class="btn btn-primary" type="button">使用 LINE 登入</button>
@@ -73,7 +73,7 @@
               <button id="draw-btn" class="btn btn-primary" type="button">正式抽籤</button>
               <button id="refresh-detail-btn" class="btn btn-secondary" type="button">刷新狀態</button>
             </div>
-            <p class="nickname-help">只有正式抽籤時才會檢查點數。點數不足只會提示，不會釋放你的抽籤回合。</p>
+            <p class="nickname-help">正式抽籤後，系統會一次顯示本次抽出的所有籤紙。點擊籤紙即可翻開；未中獎會顯示黑底，有中獎會顯示金底與獎品內容。</p>
           </div>
 
           <section class="detail-block">
@@ -82,8 +82,12 @@
           </section>
 
           <section class="detail-block">
-            <h3>本次抽獎結果</h3>
-            <div id="draw-result-box" class="list-wrap"><div class="empty-state">尚未抽獎</div></div>
+            <div class="section-header section-header-tight">
+              <h3>本次抽獎結果</h3>
+              <button id="reveal-all-btn" class="btn btn-secondary" type="button" style="display:none;">全部翻開</button>
+            </div>
+            <div id="draw-result-summary" class="draw-result-summary"></div>
+            <div id="draw-result-box" class="ticket-board"><div class="empty-state">尚未抽獎</div></div>
           </section>
         </div>
       </section>
