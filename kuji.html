@@ -8,11 +8,11 @@
 </head>
 <body>
   <main class="page kuji-page kuji-page-direct">
-    <section class="hero-card">
+    <section class="hero-card compact-hero">
       <div>
         <p class="eyebrow">線上一番賞</p>
         <h1>ICL 線上一番賞</h1>
-        <p class="hero-text">進入活動後會直接看到整面籤紙。點任一張籤即可立即翻開結果，未中獎為黑底白字，中獎為金底黑字。</p>
+        <p class="hero-text">進入活動後會直接看到全部籤紙。點任何一張就會直接翻開結果：未中獎顯示黑底白字，中獎顯示金底黑字。</p>
       </div>
       <div class="header-actions">
         <button id="login-btn" class="btn btn-primary" type="button">使用 LINE 登入</button>
@@ -34,8 +34,8 @@
       </div>
     </section>
 
-    <div class="two-pane two-pane-wide">
-      <section class="card pane-list pane-list-compact">
+    <div class="two-pane kuji-direct-layout">
+      <section class="card pane-list">
         <div class="section-header">
           <h2>活動列表</h2>
           <button id="refresh-campaigns-btn" class="btn btn-secondary" type="button">重新整理</button>
@@ -43,38 +43,34 @@
         <div id="campaign-list" class="list-wrap"></div>
       </section>
 
-      <section class="card pane-detail pane-detail-focus">
+      <section class="card pane-detail">
         <div id="campaign-empty" class="empty-state">請先從左側選擇活動</div>
         <div id="campaign-detail" style="display:none;">
-          <div class="section-header section-header-top">
-            <div>
-              <h2 id="campaign-title">-</h2>
-              <p id="campaign-description" class="muted campaign-description"></p>
-            </div>
+          <div class="section-header">
+            <h2 id="campaign-title">-</h2>
             <span id="campaign-status-badge" class="status-chip idle">未開始</span>
           </div>
 
-          <div class="kuji-banner-row">
-            <img id="campaign-image" class="kuji-cover" src="https://placehold.co/800x420?text=KUJI" alt="活動封面" />
-            <div class="kuji-side-panel">
-              <div id="campaign-stats" class="stat-grid stat-grid-compact"></div>
-              <div class="ticket-legend">
-                <span class="legend-chip legend-closed">未翻開</span>
-                <span class="legend-chip legend-lose">未中獎</span>
-                <span class="legend-chip legend-win">中獎</span>
+          <div class="ichiban-hero">
+            <img id="campaign-image" class="ichiban-cover" src="https://placehold.co/1200x600?text=KUJI" alt="活動封面" />
+            <div>
+              <p id="campaign-description" class="muted"></p>
+              <div id="campaign-stats" class="ichiban-stats"></div>
+              <div class="ticket-toolbar ticket-toolbar-top">
+                <div class="ticket-tip">直接點選任一張籤紙即可翻開。已翻開的籤會保留結果。</div>
+                <button id="refresh-wall-btn" class="btn btn-secondary" type="button">重新整理籤紙</button>
               </div>
-              <div id="ticket-hint" class="ticket-hint">請先登入，登入後可直接點籤翻牌。</div>
-              <div id="turn-status-inline" class="ticket-turn-status muted"></div>
             </div>
           </div>
 
-          <section class="detail-block detail-block-emphasis">
-            <div class="section-header">
-              <h3>抽籤籤紙</h3>
-              <div id="ticket-progress" class="ticket-progress">-</div>
+          <section class="ticket-stage-wrap">
+            <div class="ticket-stage-head">
+              <div>
+                <h3>抽獎籤紙</h3>
+                <p id="ticket-wall-summary" class="muted">載入中...</p>
+              </div>
             </div>
-            <p class="ticket-wall-note">直接點任一張可抽的籤紙即可翻開。若目前有人正在操作，系統會依回合保護限制暫時鎖定。</p>
-            <div id="ticket-wall" class="ticket-wall"></div>
+            <div id="ticket-grid" class="ticket-grid direct-ticket-grid"></div>
           </section>
 
           <section class="detail-block">
