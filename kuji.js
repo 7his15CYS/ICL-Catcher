@@ -7,9 +7,10 @@ const state = {
   currentCampaignId: qs.get('campaignId') ? Number(qs.get('campaignId')) : null,
   currentDetail: null,
   countdownTimer: null,
-  latestDrawResult: null,
-  revealedTicketNos: new Set(),
+  drawing: false,
+  autoRefreshTimer: null,
 };
+
 const els = {
   loginBtn: document.getElementById('login-btn'),
   logoutBtn: document.getElementById('logout-btn'),
@@ -26,67 +27,446 @@ const els = {
   campaignImage: document.getElementById('campaign-image'),
   campaignDescription: document.getElementById('campaign-description'),
   campaignStats: document.getElementById('campaign-stats'),
-  turnStatusText: document.getElementById('turn-status-text'),
-  turnCountdown: document.getElementById('turn-countdown'),
-  claimTurnBtn: document.getElementById('claim-turn-btn'),
-  releaseTurnBtn: document.getElementById('release-turn-btn'),
-  drawCountInput: document.getElementById('draw-count-input'),
-  drawBtn: document.getElementById('draw-btn'),
   refreshCampaignsBtn: document.getElementById('refresh-campaigns-btn'),
-  refreshDetailBtn: document.getElementById('refresh-detail-btn'),
   prizeList: document.getElementById('prize-list'),
-  drawResultBox: document.getElementById('draw-result-box'),
-  drawResultSummary: document.getElementById('draw-result-summary'),
-  revealAllBtn: document.getElementById('reveal-all-btn'),
+  ticketHint: document.getElementById('ticket-hint'),
+  turnStatusInline: document.getElementById('turn-status-inline'),
+  ticketWall: document.getElementById('ticket-wall'),
+  ticketProgress: document.getElementById('ticket-progress'),
 };
-function escapeHtml(v) { return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
-function normalizeError(err, fallback='發生錯誤') { if (err==null) return fallback; if (typeof err==='string') return err; if (err instanceof Error) return err.message||fallback; if (typeof err==='object') return err.message||err.error||fallback; return String(err); }
-function showMessage(message, isError=false) { const text=normalizeError(message,''); if(!text){els.messageBox.style.display='none'; return;} els.messageBox.textContent=text; els.messageBox.style.display='block'; els.messageBox.className=isError?'message error':'message success'; }
-function clearMessage(){showMessage('');}
-function setButtonLoading(button, loading, label='處理中...'){ if(!button)return; if(!button.dataset.originalText) button.dataset.originalText=button.textContent||''; button.disabled=loading; button.textContent=loading?label:button.dataset.originalText; }
-function makeRequestId(prefix){ return window.crypto?.randomUUID ? `${prefix}-${window.crypto.randomUUID()}` : `${prefix}-${Date.now()}`; }
-function getCleanAppUrl(){ return `${window.location.origin}${window.location.pathname}${window.location.search}`; }
-async function callApi(action,payload={},includeToken=true){ const c=getConfig(); const body={action,...payload}; if(includeToken&&state.accessToken) body.accessToken=state.accessToken; const res=await fetch(`${c.supabaseUrl}/functions/v1/${c.apiFunctionName}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:c.supabaseAnonKey},body:JSON.stringify(body)}); const text=await res.text(); let data={}; try{data=text?JSON.parse(text):{};}catch{data={message:text};} if(!res.ok||data.ok===false) throw data; return data; }
 
-function renderMember(member, points){ if(!member){ els.memberSection.style.display='none'; els.loginBtn.style.display='inline-flex'; els.logoutBtn.style.display='none'; return; } els.memberSection.style.display='block'; els.loginBtn.style.display='none'; els.logoutBtn.style.display='inline-flex'; els.memberName.textContent=member.nickname||member.display_name||'LINE 會員'; els.memberAvatar.src=member.avatar_url||'https://placehold.co/96x96?text=User'; els.memberPoints.textContent=String(points ?? member.current_points ?? 0); }
-function renderCampaignList(){ if(!state.campaigns.length){ els.campaignList.innerHTML='<div class="empty-state">目前沒有上架中的一番賞活動</div>'; return; } els.campaignList.innerHTML=state.campaigns.map(c=>`<button class="campaign-row ${state.currentCampaignId===Number(c.id)?'active':''}" data-id="${c.id}" type="button"><div class="campaign-row-title">${escapeHtml(c.title)}</div><div class="campaign-row-sub">${Number(c.points_per_draw||0)} 點 / 抽 ・ 剩餘 ${Number(c.remaining_tickets||0)}</div></button>`).join(''); els.campaignList.querySelectorAll('.campaign-row').forEach(btn=>btn.addEventListener('click',()=>openCampaign(Number(btn.dataset.id)))); }
-function stopCountdown(){ if(state.countdownTimer){ clearInterval(state.countdownTimer); state.countdownTimer=null; } }
-function getTurnSecondsLeft(){ const expires = state.currentDetail?.turn?.holder_expires_at; if(!expires) return 0; return Math.max(0, Math.ceil((new Date(expires).getTime()-Date.now())/1000)); }
-function updateTurnUi(){ const detail=state.currentDetail; if(!detail) return; const turn=detail.turn||{}; const left=getTurnSecondsLeft(); const mine=Boolean(turn.my_turn && left>0); const occupied=Boolean(turn.occupied_by_other && left>0); if(mine){ els.turnStatusText.textContent='目前是你的抽籤回合，別人不能搶。'; els.turnCountdown.textContent=`剩餘 ${left}s`; els.claimTurnBtn.style.display='none'; els.releaseTurnBtn.style.display='inline-flex'; els.drawBtn.disabled=false; } else if(occupied){ els.turnStatusText.textContent=`目前由 ${turn.holder_nickname || '其他玩家'} 持有抽籤回合。`; els.turnCountdown.textContent=`約 ${left}s 後可重新搶回合`; els.claimTurnBtn.style.display='inline-flex'; els.claimTurnBtn.disabled=true; els.releaseTurnBtn.style.display='none'; els.drawBtn.disabled=true; } else { els.turnStatusText.textContent='目前沒有人持有抽籤回合。'; els.turnCountdown.textContent='未開始'; els.claimTurnBtn.style.display='inline-flex'; els.claimTurnBtn.disabled=false; els.releaseTurnBtn.style.display='none'; els.drawBtn.disabled=true; }
+function escapeHtml(v) {
+  return String(v ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
-function startCountdown(){ stopCountdown(); updateTurnUi(); state.countdownTimer=setInterval(async()=>{ updateTurnUi(); if(getTurnSecondsLeft()<=0){ stopCountdown(); await refreshCurrentCampaign(true); } },1000); }
-function getDrawRows(result){ return Array.isArray(result?.results) ? result.results : (Array.isArray(result?.draw_results) ? result.draw_results : []); }
-function getTicketKey(row, idx){ return String(row?.ticket_no ?? row?.ticket_pool_id ?? row?.id ?? `idx-${idx}`); }
-function isWinningRow(row){ return Boolean((row?.prize_name && String(row.prize_name).trim()) || (row?.prize_code && String(row.prize_code).trim())); }
-function buildTicketFront(row, idx){ return `<div class="ticket-face ticket-face-front"><span class="ticket-seq">${String(idx+1).padStart(3,'0')}</span></div>`; }
-function buildTicketBack(row, idx){ const winning = isWinningRow(row); const title = winning ? `${escapeHtml(row.prize_code || '')} ${escapeHtml(row.prize_name || '')}`.trim() : '未中獎'; const subtitle = winning ? `票號 ${escapeHtml(row.ticket_no ?? String(idx+1).padStart(3,'0'))}` : '再接再厲'; return `<div class="ticket-face ticket-face-back ${winning ? 'is-winning' : 'is-losing'}"><span class="ticket-seq ticket-seq-back">${escapeHtml(String(row.ticket_no ?? String(idx+1).padStart(3,'0')).padStart(3,'0'))}</span><div class="ticket-result-title">${title}</div><div class="ticket-result-subtitle">${subtitle}</div></div>`; }
-function toggleTicketReveal(ticketKey, button){ if(state.revealedTicketNos.has(ticketKey)){ return; } state.revealedTicketNos.add(ticketKey); button.classList.add('is-revealed'); button.setAttribute('aria-pressed','true'); }
-function renderResultBox(){ const result = state.latestDrawResult; if(!result){ els.drawResultSummary.innerHTML=''; els.drawResultBox.innerHTML='<div class="empty-state">尚未抽獎</div>'; if(els.revealAllBtn) els.revealAllBtn.style.display='none'; return; } const rows = getDrawRows(result); const spent = result.points_spent ?? result.total_points_spent ?? null; const total = rows.length; const winningCount = rows.filter(isWinningRow).length; els.drawResultSummary.innerHTML = `<div class="result-summary-card">${spent!=null?`本次扣除 <strong>${Number(spent)}</strong> 點 ・ `:''}共 <strong>${total}</strong> 張籤紙 ・ 中獎 <strong>${winningCount}</strong> 張</div>`; if(!rows.length){ els.drawResultBox.innerHTML='<div class="empty-state">本次沒有回傳獎項資料</div>'; if(els.revealAllBtn) els.revealAllBtn.style.display='none'; return; } els.drawResultBox.innerHTML = rows.map((row,idx)=>{ const ticketKey = getTicketKey(row, idx); const revealed = state.revealedTicketNos.has(ticketKey); return `<button class="ticket-card ${revealed ? 'is-revealed' : ''}" type="button" data-ticket-key="${escapeHtml(ticketKey)}" aria-pressed="${revealed ? 'true' : 'false'}">${buildTicketFront(row, idx)}${buildTicketBack(row, idx)}</button>`; }).join(''); els.drawResultBox.querySelectorAll('.ticket-card').forEach((button)=>{ button.addEventListener('click',()=>toggleTicketReveal(button.dataset.ticketKey || '', button)); }); if(els.revealAllBtn) els.revealAllBtn.style.display = rows.length ? 'inline-flex' : 'none'; }
-function renderCurrentCampaign(){ const detail=state.currentDetail; if(!detail){ els.campaignEmpty.style.display='block'; els.campaignDetail.style.display='none'; return; } const campaign=detail.campaign||{}; els.campaignEmpty.style.display='none'; els.campaignDetail.style.display='block'; els.campaignTitle.textContent=campaign.title||'-'; els.campaignImage.src=campaign.cover_image_url||'https://placehold.co/1200x600?text=KUJI'; els.campaignDescription.textContent=campaign.description||'暫無活動說明'; els.campaignStatusBadge.textContent=campaign.status||'-'; els.campaignStatusBadge.className=`status-chip ${campaign.status==='active'?'busy':'idle'}`; const hold = Number(campaign.turn_hold_seconds ?? campaign.reserve_seconds ?? 0); els.campaignStats.innerHTML=`<div class="stat-chip">每抽 ${Number(campaign.points_per_draw||0)} 點</div><div class="stat-chip">總籤數 ${Number(campaign.total_tickets||0)}</div><div class="stat-chip">剩餘 ${Number(campaign.remaining_tickets||0)}</div><div class="stat-chip">單次最多 ${Number(campaign.max_draw_per_order||1)} 抽</div><div class="stat-chip">回合保留 ${hold} 秒</div>`;
-  const max=Number(campaign.max_draw_per_order||1); els.drawCountInput.max=String(max); if(Number(els.drawCountInput.value)>max) els.drawCountInput.value=String(max);
-  const prizes = detail.prizes || []; els.prizeList.innerHTML = prizes.length ? prizes.map(p=>`<article class="prize-card"><img class="prize-image" src="${escapeHtml(p.prize_image_url || 'https://placehold.co/240x180?text=Prize')}" alt="${escapeHtml(p.prize_name)}"><div class="prize-body"><div class="prize-code">${escapeHtml(p.prize_code)}</div><h4>${escapeHtml(p.prize_name)}</h4><div class="prize-meta">剩餘 ${Number(p.remaining_quantity||0)} / 共 ${Number(p.total_quantity||0)}</div></div></article>`).join('') : '<div class="empty-state">尚未設定獎項</div>';
-  renderResultBox();
-  startCountdown();
+
+function normalizeError(err, fallback = '發生錯誤') {
+  if (err == null) return fallback;
+  if (typeof err === 'string') return err;
+  if (err instanceof Error) return err.message || fallback;
+  if (typeof err === 'object') return err.message || err.error || fallback;
+  return String(err);
 }
-async function loadDashboard(){ if(!state.accessToken) return; const data = await callApi('login'); state.member=data.member; renderMember(data.member,data.points); }
-async function loadCampaigns(){ const data=await callApi('get_kuji_campaigns',{},false); state.campaigns=data.campaigns||[]; renderCampaignList(); if(state.currentCampaignId && !state.campaigns.some(c=>Number(c.id)===Number(state.currentCampaignId))){ state.currentCampaignId = state.campaigns[0] ? Number(state.campaigns[0].id) : null; } if(!state.currentCampaignId && state.campaigns[0]) state.currentCampaignId=Number(state.campaigns[0].id); if(state.currentCampaignId) await openCampaign(state.currentCampaignId,true); }
-async function openCampaign(campaignId,silent=false){ state.currentCampaignId=campaignId; const data=await callApi('get_kuji_campaign_detail',{campaignId},!!state.accessToken); state.currentDetail=data; renderCampaignList(); renderCurrentCampaign(); const url=new URL(window.location.href); url.searchParams.set('campaignId',String(campaignId)); window.history.replaceState({},document.title,url.toString()); if(!silent) clearMessage(); }
-async function refreshCurrentCampaign(silent=false){ if(!state.currentCampaignId) return; await openCampaign(state.currentCampaignId,silent); }
-async function claimTurn(){ try{ setButtonLoading(els.claimTurnBtn,true); clearMessage(); const result=await callApi('claim_kuji_turn',{campaignId:state.currentCampaignId}); showMessage(result.message || '已取得抽籤回合'); await refreshCurrentCampaign(true); } catch(error){ showMessage(normalizeError(error,'取得抽籤回合失敗'),true); await refreshCurrentCampaign(true);} finally{ setButtonLoading(els.claimTurnBtn,false);} }
-async function releaseTurn(){ try{ setButtonLoading(els.releaseTurnBtn,true); clearMessage(); const result=await callApi('release_kuji_turn',{campaignId:state.currentCampaignId}); showMessage(result.message || '已放棄抽籤回合'); await refreshCurrentCampaign(true); } catch(error){ showMessage(normalizeError(error,'放棄回合失敗'),true); await refreshCurrentCampaign(true);} finally{ setButtonLoading(els.releaseTurnBtn,false);} }
-async function drawNow(){ try{ setButtonLoading(els.drawBtn,true,'抽籤中...'); clearMessage(); const drawCount = Number(els.drawCountInput.value || 1); const result=await callApi('draw_kuji_with_points',{campaignId:state.currentCampaignId,drawCount,requestId:makeRequestId('kuji-draw')}); state.latestDrawResult=result; state.revealedTicketNos = new Set(); renderResultBox(); showMessage(result.message || '抽籤成功'); await loadDashboard(); await refreshCurrentCampaign(true); } catch(error){ showMessage(normalizeError(error,'抽籤失敗'),true); await refreshCurrentCampaign(true);} finally{ setButtonLoading(els.drawBtn,false);} }
-async function signIn(){ if(!liff.isLoggedIn()){ liff.login({redirectUri:getCleanAppUrl()}); return; } await bootstrap(); }
-async function signOut(){ stopCountdown(); if(window.liff&&liff.isLoggedIn()) liff.logout(); state.accessToken=null; state.member=null; renderMember(null); showMessage('已登出'); }
-async function bootstrap(){ try{ const c=getConfig(); if(!c.liffId||!c.supabaseUrl||!c.supabaseAnonKey||!c.apiFunctionName) throw new Error('請先設定 config.js'); await liff.init({liffId:c.liffId,withLoginOnExternalBrowser:false}); if(liff.isLoggedIn()){ state.accessToken=liff.getAccessToken(); await loadDashboard(); } else { renderMember(null); }
- await loadCampaigns(); } catch(error){ showMessage(normalizeError(error,'初始化失敗'),true);} }
-els.loginBtn?.addEventListener('click',signIn);
-els.logoutBtn?.addEventListener('click',signOut);
-els.refreshCampaignsBtn?.addEventListener('click',()=>loadCampaigns().catch(e=>showMessage(normalizeError(e,'刷新活動失敗'),true)));
-els.refreshDetailBtn?.addEventListener('click',()=>refreshCurrentCampaign().catch(e=>showMessage(normalizeError(e,'刷新活動失敗'),true)));
-els.claimTurnBtn?.addEventListener('click',()=>claimTurn());
-els.releaseTurnBtn?.addEventListener('click',()=>releaseTurn());
-els.drawBtn?.addEventListener('click',()=>drawNow());
-window.addEventListener('pagehide',()=>stopCountdown());
+
+function showMessage(message, isError = false) {
+  const text = normalizeError(message, '');
+  if (!text) {
+    els.messageBox.style.display = 'none';
+    return;
+  }
+  els.messageBox.textContent = text;
+  els.messageBox.style.display = 'block';
+  els.messageBox.className = isError ? 'message error' : 'message success';
+}
+
+function clearMessage() { showMessage(''); }
+function padTicketNo(value) { return String(Number(value)).padStart(3, '0'); }
+function makeRequestId(prefix) { return window.crypto?.randomUUID ? `${prefix}-${window.crypto.randomUUID()}` : `${prefix}-${Date.now()}`; }
+function getCleanAppUrl() { return `${window.location.origin}${window.location.pathname}${window.location.search}`; }
+
+async function callApi(action, payload = {}, includeToken = true) {
+  const c = getConfig();
+  const body = { action, ...payload };
+  if (includeToken && state.accessToken) body.accessToken = state.accessToken;
+  const res = await fetch(`${c.supabaseUrl}/functions/v1/${c.apiFunctionName}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: c.supabaseAnonKey },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data = {};
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
+  if (!res.ok || data.ok === false) throw data;
+  return data;
+}
+
+function getStorageKey() {
+  return `kuji-revealed-v2:${state.currentCampaignId || 'none'}`;
+}
+
+function loadRevealedMap() {
+  try {
+    const raw = window.sessionStorage.getItem(getStorageKey());
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveRevealedMap(map) {
+  try {
+    window.sessionStorage.setItem(getStorageKey(), JSON.stringify(map));
+  } catch {
+    // ignore storage failure
+  }
+}
+
+function getRevealedCount() {
+  return Object.keys(loadRevealedMap()).length;
+}
+
+function rememberDrawResult(row) {
+  const map = loadRevealedMap();
+  const ticketNo = padTicketNo(row.ticket_no);
+  map[ticketNo] = {
+    ticket_no: ticketNo,
+    prize_code: row.prize_code || '',
+    prize_name: row.prize_name || '未中獎',
+    is_win: Boolean((row.prize_code || '').trim()),
+  };
+  saveRevealedMap(map);
+}
+
+function getConsumedUnknownTicketNos(totalTickets, remainingTickets, revealedMap) {
+  const consumedCount = Math.max(0, totalTickets - remainingTickets);
+  const knownConsumed = Object.keys(revealedMap).length;
+  const unknownConsumedCount = Math.max(0, consumedCount - knownConsumed);
+  if (!unknownConsumedCount) return new Set();
+
+  const result = new Set();
+  for (let n = totalTickets; n >= 1 && result.size < unknownConsumedCount; n -= 1) {
+    const key = padTicketNo(n);
+    if (!revealedMap[key]) result.add(key);
+  }
+  return result;
+}
+
+function renderMember(member, points) {
+  if (!member) {
+    els.memberSection.style.display = 'none';
+    els.loginBtn.style.display = 'inline-flex';
+    els.logoutBtn.style.display = 'none';
+    return;
+  }
+  els.memberSection.style.display = 'block';
+  els.loginBtn.style.display = 'none';
+  els.logoutBtn.style.display = 'inline-flex';
+  els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
+  els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
+  els.memberPoints.textContent = String(points ?? member.current_points ?? 0);
+}
+
+function renderCampaignList() {
+  if (!state.campaigns.length) {
+    els.campaignList.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>';
+    return;
+  }
+  els.campaignList.innerHTML = state.campaigns.map((c) => `
+    <button class="campaign-row ${state.currentCampaignId === Number(c.id) ? 'active' : ''}" data-id="${c.id}" type="button">
+      <div class="campaign-row-title">${escapeHtml(c.title)}</div>
+      <div class="campaign-row-sub">${Number(c.points_per_draw || 0)} 點 / 張 ・ 剩餘 ${Number(c.remaining_tickets || 0)} / ${Number(c.total_tickets || 0)}</div>
+    </button>`).join('');
+  els.campaignList.querySelectorAll('.campaign-row').forEach((btn) => btn.addEventListener('click', () => openCampaign(Number(btn.dataset.id))));
+}
+
+function stopCountdown() {
+  if (state.countdownTimer) {
+    clearInterval(state.countdownTimer);
+    state.countdownTimer = null;
+  }
+}
+
+function stopAutoRefresh() {
+  if (state.autoRefreshTimer) {
+    clearInterval(state.autoRefreshTimer);
+    state.autoRefreshTimer = null;
+  }
+}
+
+function getTurnSecondsLeft() {
+  const expires = state.currentDetail?.turn?.holder_expires_at;
+  if (!expires) return 0;
+  return Math.max(0, Math.ceil((new Date(expires).getTime() - Date.now()) / 1000));
+}
+
+function renderTurnInline() {
+  const detail = state.currentDetail;
+  if (!detail) return;
+  const turn = detail.turn || {};
+  const left = getTurnSecondsLeft();
+  const mine = Boolean(turn.my_turn && left > 0);
+  const occupied = Boolean(turn.occupied_by_other && left > 0);
+
+  if (!state.accessToken) {
+    els.ticketHint.textContent = '請先登入，登入後可直接點籤翻牌。';
+    els.turnStatusInline.textContent = '';
+    return;
+  }
+
+  if (state.drawing) {
+    els.ticketHint.textContent = '抽籤中，請稍候…';
+    return;
+  }
+
+  if (mine) {
+    els.ticketHint.textContent = '現在輪到你，可直接連續點籤翻開。';
+    els.turnStatusInline.textContent = `你的操作保留中，剩餘 ${left} 秒。`;
+  } else if (occupied) {
+    els.ticketHint.textContent = '目前有人正在操作，暫時不能翻籤。';
+    els.turnStatusInline.textContent = `由 ${turn.holder_nickname || '其他玩家'} 操作中，約 ${left} 秒後可再試。`;
+  } else {
+    els.ticketHint.textContent = '直接點任一張可抽的籤紙即可翻開。';
+    els.turnStatusInline.textContent = '目前沒有人持有操作回合。';
+  }
+}
+
+function startTimers() {
+  stopCountdown();
+  stopAutoRefresh();
+  renderTurnInline();
+  state.countdownTimer = setInterval(async () => {
+    renderTurnInline();
+    if (getTurnSecondsLeft() <= 0) {
+      stopCountdown();
+      await refreshCurrentCampaign(true);
+    }
+  }, 1000);
+  state.autoRefreshTimer = setInterval(() => refreshCurrentCampaign(true).catch(() => {}), 15000);
+}
+
+function createTicketButton(ticketNo, type, contentHtml, disabled = false) {
+  return `
+    <button class="ticket-card ticket-${type}" type="button" data-ticket-no="${ticketNo}" ${disabled ? 'disabled' : ''}>
+      ${contentHtml}
+    </button>`;
+}
+
+function renderTicketWall() {
+  const detail = state.currentDetail;
+  if (!detail) {
+    els.ticketWall.innerHTML = '<div class="empty-state">請先選擇活動</div>';
+    return;
+  }
+  const campaign = detail.campaign || {};
+  const totalTickets = Number(campaign.total_tickets || 0);
+  const remainingTickets = Number(campaign.remaining_tickets || 0);
+  const revealedMap = loadRevealedMap();
+  const consumedUnknownNos = getConsumedUnknownTicketNos(totalTickets, remainingTickets, revealedMap);
+  const myOpenedCount = Object.keys(revealedMap).length;
+  const consumedCount = Math.max(0, totalTickets - remainingTickets);
+
+  els.ticketProgress.textContent = `總籤 ${totalTickets} 張 ・ 已抽出 ${consumedCount} 張 ・ 剩餘 ${remainingTickets} 張`;
+
+  if (!totalTickets) {
+    els.ticketWall.innerHTML = '<div class="empty-state">此活動尚未設定籤紙</div>';
+    return;
+  }
+
+  const html = [];
+  for (let n = 1; n <= totalTickets; n += 1) {
+    const ticketNo = padTicketNo(n);
+    const revealed = revealedMap[ticketNo];
+    if (revealed) {
+      const content = revealed.is_win
+        ? `<span class="ticket-no">${ticketNo}</span><span class="ticket-main">${escapeHtml(revealed.prize_code)}</span><span class="ticket-sub">${escapeHtml(revealed.prize_name)}</span>`
+        : `<span class="ticket-no">${ticketNo}</span><span class="ticket-main">未中獎</span><span class="ticket-sub">謝謝參與</span>`;
+      html.push(createTicketButton(ticketNo, revealed.is_win ? 'win' : 'lose', content, true));
+      continue;
+    }
+
+    if (consumedUnknownNos.has(ticketNo)) {
+      html.push(createTicketButton(ticketNo, 'used', `<span class="ticket-no">${ticketNo}</span><span class="ticket-main">已抽出</span><span class="ticket-sub">非本次翻牌紀錄</span>`, true));
+      continue;
+    }
+
+    const blockedByOther = Boolean(state.currentDetail?.turn?.occupied_by_other && getTurnSecondsLeft() > 0);
+    const drawingLocked = state.drawing;
+    const disabled = blockedByOther || drawingLocked || !state.accessToken;
+    html.push(createTicketButton(ticketNo, 'closed', `<span class="ticket-index">${ticketNo}</span>`, disabled));
+  }
+
+  els.ticketWall.innerHTML = html.join('');
+  els.ticketWall.querySelectorAll('.ticket-card.ticket-closed').forEach((button) => {
+    button.addEventListener('click', () => handleTicketClick(button.dataset.ticketNo));
+  });
+
+  const footerNote = myOpenedCount
+    ? `<div class="ticket-session-note">你本頁已翻開 ${myOpenedCount} 張。重新整理後仍會保留你本次瀏覽器的翻牌結果。</div>`
+    : '';
+  els.ticketWall.insertAdjacentHTML('beforeend', footerNote);
+}
+
+function renderCurrentCampaign() {
+  const detail = state.currentDetail;
+  if (!detail) {
+    els.campaignEmpty.style.display = 'block';
+    els.campaignDetail.style.display = 'none';
+    return;
+  }
+
+  const campaign = detail.campaign || {};
+  els.campaignEmpty.style.display = 'none';
+  els.campaignDetail.style.display = 'block';
+  els.campaignTitle.textContent = campaign.title || '-';
+  els.campaignImage.src = campaign.cover_image_url || 'https://placehold.co/900x500?text=KUJI';
+  els.campaignDescription.textContent = campaign.description || '暫無活動說明';
+  els.campaignStatusBadge.textContent = campaign.status || '-';
+  els.campaignStatusBadge.className = `status-chip ${campaign.status === 'active' ? 'busy' : 'idle'}`;
+  const hold = Number(campaign.turn_hold_seconds ?? campaign.reserve_seconds ?? 0);
+  els.campaignStats.innerHTML = `
+    <div class="stat-chip">每抽 ${Number(campaign.points_per_draw || 0)} 點</div>
+    <div class="stat-chip">總籤數 ${Number(campaign.total_tickets || 0)}</div>
+    <div class="stat-chip">剩餘 ${Number(campaign.remaining_tickets || 0)}</div>
+    <div class="stat-chip">保留 ${hold} 秒</div>`;
+
+  const prizes = detail.prizes || [];
+  els.prizeList.innerHTML = prizes.length
+    ? prizes.map((p) => `
+      <article class="prize-card compact-prize-card">
+        <img class="prize-image" src="${escapeHtml(p.prize_image_url || 'https://placehold.co/240x180?text=Prize')}" alt="${escapeHtml(p.prize_name)}">
+        <div class="prize-body">
+          <div class="prize-code">${escapeHtml(p.prize_code)}</div>
+          <h4>${escapeHtml(p.prize_name)}</h4>
+          <div class="prize-meta">剩餘 ${Number(p.remaining_quantity || 0)} / 共 ${Number(p.total_quantity || 0)}</div>
+        </div>
+      </article>`).join('')
+    : '<div class="empty-state">尚未設定獎項</div>';
+
+  renderTurnInline();
+  renderTicketWall();
+  startTimers();
+}
+
+async function loadDashboard() {
+  if (!state.accessToken) return;
+  const data = await callApi('login');
+  state.member = data.member;
+  renderMember(data.member, data.points);
+}
+
+async function loadCampaigns() {
+  const data = await callApi('get_kuji_campaigns', {}, false);
+  state.campaigns = data.campaigns || [];
+  renderCampaignList();
+  if (state.currentCampaignId && !state.campaigns.some((c) => Number(c.id) === Number(state.currentCampaignId))) {
+    state.currentCampaignId = state.campaigns[0] ? Number(state.campaigns[0].id) : null;
+  }
+  if (!state.currentCampaignId && state.campaigns[0]) state.currentCampaignId = Number(state.campaigns[0].id);
+  if (state.currentCampaignId) await openCampaign(state.currentCampaignId, true);
+}
+
+async function openCampaign(campaignId, silent = false) {
+  state.currentCampaignId = campaignId;
+  const data = await callApi('get_kuji_campaign_detail', { campaignId }, !!state.accessToken);
+  state.currentDetail = data;
+  renderCampaignList();
+  renderCurrentCampaign();
+  const url = new URL(window.location.href);
+  url.searchParams.set('campaignId', String(campaignId));
+  window.history.replaceState({}, document.title, url.toString());
+  if (!silent) clearMessage();
+}
+
+async function refreshCurrentCampaign(silent = false) {
+  if (!state.currentCampaignId) return;
+  await openCampaign(state.currentCampaignId, silent);
+}
+
+async function ensureTurnReady() {
+  const turn = state.currentDetail?.turn || {};
+  const left = getTurnSecondsLeft();
+  if (turn.my_turn && left > 0) return;
+  if (turn.occupied_by_other && left > 0) {
+    throw new Error(`目前由 ${turn.holder_nickname || '其他玩家'} 操作中，請稍後再試。`);
+  }
+  await callApi('claim_kuji_turn', { campaignId: state.currentCampaignId });
+  await refreshCurrentCampaign(true);
+}
+
+async function handleTicketClick(clickedTicketNo) {
+  if (state.drawing) return;
+  if (!state.accessToken) {
+    showMessage('請先使用 LINE 登入，再點籤翻牌。', true);
+    return;
+  }
+
+  state.drawing = true;
+  clearMessage();
+  renderTurnInline();
+  renderTicketWall();
+
+  try {
+    await ensureTurnReady();
+    const result = await callApi('draw_kuji_with_points', {
+      campaignId: state.currentCampaignId,
+      drawCount: 1,
+      requestId: makeRequestId(`ticket-${clickedTicketNo}`),
+    });
+    const rows = Array.isArray(result.results)
+      ? result.results
+      : (Array.isArray(result.draw_results) ? result.draw_results : []);
+    const firstRow = rows[0];
+    if (!firstRow || !firstRow.ticket_no) {
+      throw new Error('系統未回傳籤紙資料');
+    }
+
+    rememberDrawResult(firstRow);
+    await loadDashboard();
+    await refreshCurrentCampaign(true);
+
+    const actualTicket = padTicketNo(firstRow.ticket_no);
+    const hasPrize = Boolean((firstRow.prize_code || '').trim());
+    const revealMessage = actualTicket === clickedTicketNo
+      ? `已翻開 ${actualTicket}：${hasPrize ? `${firstRow.prize_code} ${firstRow.prize_name}` : '未中獎'}`
+      : `你點了 ${clickedTicketNo}，系統實際抽出 ${actualTicket}：${hasPrize ? `${firstRow.prize_code} ${firstRow.prize_name}` : '未中獎'}`;
+    showMessage(revealMessage, false);
+  } catch (error) {
+    showMessage(normalizeError(error, '翻牌失敗'), true);
+    await refreshCurrentCampaign(true);
+  } finally {
+    state.drawing = false;
+    renderTurnInline();
+    renderTicketWall();
+  }
+}
+
+async function signIn() {
+  if (!liff.isLoggedIn()) {
+    liff.login({ redirectUri: getCleanAppUrl() });
+    return;
+  }
+  await bootstrap();
+}
+
+async function signOut() {
+  stopCountdown();
+  stopAutoRefresh();
+  if (window.liff && liff.isLoggedIn()) liff.logout();
+  state.accessToken = null;
+  state.member = null;
+  renderMember(null);
+  renderTurnInline();
+  renderTicketWall();
+  showMessage('已登出');
+}
+
+async function bootstrap() {
+  try {
+    const c = getConfig();
+    if (!c.liffId || !c.supabaseUrl || !c.supabaseAnonKey || !c.apiFunctionName) throw new Error('請先設定 config.js');
+    await liff.init({ liffId: c.liffId, withLoginOnExternalBrowser: false });
+    if (liff.isLoggedIn()) {
+      state.accessToken = liff.getAccessToken();
+      await loadDashboard();
+    } else {
+      renderMember(null);
+    }
+    await loadCampaigns();
+  } catch (error) {
+    showMessage(normalizeError(error, '初始化失敗'), true);
+  }
+}
+
+els.loginBtn?.addEventListener('click', signIn);
+els.logoutBtn?.addEventListener('click', signOut);
+els.refreshCampaignsBtn?.addEventListener('click', () => loadCampaigns().catch((e) => showMessage(normalizeError(e, '刷新活動失敗'), true)));
+window.addEventListener('pagehide', () => {
+  stopCountdown();
+  stopAutoRefresh();
+});
 bootstrap();
-
-els.revealAllBtn?.addEventListener('click',()=>{ const rows = getDrawRows(state.latestDrawResult || {}); rows.forEach((row, idx)=>state.revealedTicketNos.add(getTicketKey(row, idx))); renderResultBox(); });
