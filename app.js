@@ -1,5 +1,3 @@
-function getConfig() { return window.APP_CONFIG || {}; }
-
 const els = {
   authSection: document.getElementById('auth-section'),
   loginBtn: document.getElementById('login-btn'),
@@ -15,15 +13,13 @@ const els = {
   rewardsList: document.getElementById('rewards-list'),
   redemptionList: document.getElementById('redemption-list'),
   leaderboardList: document.getElementById('leaderboard-list'),
-  kujiSummary: document.getElementById('kuji-summary'),
-  adminKujiLink: document.getElementById('admin-kuji-link'),
+  ichibanSection: document.getElementById('ichiban-section'),
+  ichibanSummary: document.getElementById('ichiban-summary'),
+  adminSection: document.getElementById('admin-section'),
 };
 
-const state = { accessToken: null, dashboard: null, campaigns: [] };
-
-function escapeHtml(v) {
-  return String(v ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
-}
+const state = { accessToken: null, dashboard: null, pending: new Set() };
+function getConfig() { return window.APP_CONFIG || {}; }
 function normalizeError(err, fallback = '發生錯誤') {
   if (err == null) return fallback;
   if (typeof err === 'string') return err;
@@ -31,32 +27,37 @@ function normalizeError(err, fallback = '發生錯誤') {
   if (typeof err === 'object') return err.message || err.error || fallback;
   return String(err);
 }
+function escapeHtml(value) {
+  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+}
 function showMessage(message, isError = false) {
-  const text = normalizeError(message, '');
-  if (!text) {
-    els.messageBox.style.display = 'none';
-    return;
-  }
+  const text = typeof message === 'string' ? message : normalizeError(message);
+  if (!text) { els.messageBox.style.display = 'none'; return; }
   els.messageBox.textContent = text;
   els.messageBox.style.display = 'block';
   els.messageBox.className = isError ? 'message error' : 'message success';
 }
 function clearMessage() { showMessage(''); }
-function setButtonLoading(button, loading, label = '處理中...') {
+function setButtonLoading(button, isLoading, loadingText = '處理中...') {
   if (!button) return;
   if (!button.dataset.originalText) button.dataset.originalText = button.textContent || '';
-  button.disabled = loading;
-  button.textContent = loading ? label : button.dataset.originalText;
+  button.disabled = isLoading;
+  button.textContent = isLoading ? loadingText : button.dataset.originalText;
 }
+function startPending(key) { if (state.pending.has(key)) throw new Error('上一個操作尚未完成'); state.pending.add(key); }
+function endPending(key) { state.pending.delete(key); }
 function getCleanAppUrl() { return `${window.location.origin}${window.location.pathname}`; }
-async function callApi(action, payload = {}, includeToken = true) {
+function hasLiffRedirectParams() {
+  const url = new URL(window.location.href);
+  return url.searchParams.has('code') || url.searchParams.has('state') || url.searchParams.has('liffClientId') || url.searchParams.has('liffRedirectUri');
+}
+
+async function callApi(action, payload = {}) {
   const config = getConfig();
-  const body = { action, ...payload };
-  if (includeToken && state.accessToken) body.accessToken = state.accessToken;
   const res = await fetch(`${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: config.supabaseAnonKey },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ action, accessToken: state.accessToken, ...payload }),
   });
   const text = await res.text();
   let data = {};
@@ -65,112 +66,107 @@ async function callApi(action, payload = {}, includeToken = true) {
   return data;
 }
 
-function renderLoggedOut() {
-  els.memberSection.style.display = 'none';
-  els.loginBtn.style.display = 'inline-flex';
-  els.logoutBtn.style.display = 'none';
-  if (els.adminKujiLink) els.adminKujiLink.style.display = 'none';
-}
-function renderMember(data) {
-  const member = data.member || {};
-  els.memberSection.style.display = 'block';
-  els.loginBtn.style.display = 'none';
-  els.logoutBtn.style.display = 'inline-flex';
-  els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
-  els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
-  els.memberPoints.textContent = String(data.points ?? 0);
-  els.nicknameInput.value = member.nickname || '';
-  els.memberRoleBadge.textContent = member.is_admin ? '管理員' : '一般會員';
-  if (els.adminKujiLink) els.adminKujiLink.style.display = member.is_admin ? 'inline' : 'none';
-}
-function renderRewards(rewards = []) {
-  if (!rewards.length) {
-    els.rewardsList.innerHTML = '<div class="empty-state">目前沒有可兌換獎品</div>';
-    return;
-  }
+function renderRewards(rewards) {
+  if (!rewards.length) { els.rewardsList.innerHTML = '<div class="empty-state">目前沒有可兌換獎品</div>'; return; }
   els.rewardsList.innerHTML = rewards.map((reward) => `
     <article class="reward-card">
-      <img class="reward-image" src="${escapeHtml(reward.image_url || 'https://placehold.co/640x360?text=Reward')}" alt="${escapeHtml(reward.name)}">
+      <img class="reward-image" src="${escapeHtml(reward.image_url || 'https://placehold.co/600x400?text=Reward')}" alt="${escapeHtml(reward.name)}">
       <div class="reward-body">
-        <span class="reward-category">點數兌換</span>
+        <span class="reward-category">${escapeHtml(reward.category || '兌換商品')}</span>
         <h3>${escapeHtml(reward.name)}</h3>
-        <p>${escapeHtml(reward.description || '')}</p>
-        <div class="reward-meta"><span>${Number(reward.points_cost || 0)} 點</span><span>庫存 ${Number(reward.stock || 0)}</span></div>
-      </div>
-    </article>`).join('');
-}
-function renderRedemptions(items = []) {
-  if (!items.length) {
-    els.redemptionList.innerHTML = '<div class="empty-state">你還沒有兌換紀錄</div>';
-    return;
-  }
-  els.redemptionList.innerHTML = items.map((item) => `
-    <div class="list-item">
-      <div>
-        <div class="list-title">${escapeHtml(item.reward_name)}</div>
-        <div class="list-subtitle">${new Date(item.created_at).toLocaleString('zh-TW')} ・ 狀態 ${escapeHtml(item.status)}</div>
-      </div>
-      <div class="list-points">-${Number(item.points_spent || 0)} 點</div>
-    </div>`).join('');
-}
-function renderLeaderboard(items = []) {
-  if (!items.length) {
-    els.leaderboardList.innerHTML = '<div class="empty-state">目前沒有排行榜資料</div>';
-    return;
-  }
-  els.leaderboardList.innerHTML = items.map((item, index) => `
-    <div class="list-item">
-      <div class="rank-badge">#${index + 1}</div>
-      <img class="mini-avatar" src="${escapeHtml(item.avatar_url || 'https://placehold.co/48x48?text=User')}" alt="${escapeHtml(item.display_name)}">
-      <div class="list-grow">
-        <div class="list-title">${escapeHtml(item.display_name)}</div>
-      </div>
-      <div class="list-points">${Number(item.points || 0)} 點</div>
-    </div>`).join('');
-}
-function renderKujiSummary(campaigns = []) {
-  if (!campaigns.length) {
-    els.kujiSummary.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>';
-    return;
-  }
-  els.kujiSummary.innerHTML = campaigns.map((campaign) => `
-    <article class="reward-card">
-      <img class="reward-image" src="${escapeHtml(campaign.cover_image_url || 'https://placehold.co/640x360?text=KUJI')}" alt="${escapeHtml(campaign.title)}">
-      <div class="reward-body">
-        <span class="reward-category">線上一番賞</span>
-        <h3>${escapeHtml(campaign.title)}</h3>
-        <p>${escapeHtml(campaign.description || '')}</p>
-        <div class="reward-meta"><span>${Number(campaign.points_per_draw || 0)} 點 / 抽</span><span>剩餘 ${Number(campaign.remaining_tickets || 0)}</span></div>
-        <a class="btn btn-primary card-link" href="./kuji.html?campaignId=${encodeURIComponent(campaign.id)}">進入活動</a>
+        <p>${escapeHtml(reward.description || '暫無說明')}</p>
+        <div class="reward-meta"><span>${escapeHtml(reward.points_cost)} 點</span><span>庫存 ${escapeHtml(reward.stock)}</span></div>
+        <a class="btn btn-secondary" href="./shop.html">前往兌換</a>
       </div>
     </article>`).join('');
 }
 
-async function loadCampaigns() {
-  const data = await callApi('get_kuji_campaigns', {}, false);
-  state.campaigns = data.campaigns || [];
-  renderKujiSummary(state.campaigns);
+function renderRedemptions(redemptions) {
+  if (!redemptions.length) { els.redemptionList.innerHTML = '<div class="empty-state">你還沒有兌換紀錄</div>'; return; }
+  els.redemptionList.innerHTML = redemptions.map((item) => `
+    <div class="list-item">
+      <div>
+        <div class="list-title">${escapeHtml(item.reward_name)}</div>
+        <div class="list-subtitle">${new Date(item.created_at).toLocaleString('zh-TW')} ・ 狀態：${escapeHtml(item.status)}</div>
+      </div>
+      <div class="list-points">-${escapeHtml(item.points_spent)} 點</div>
+    </div>`).join('');
 }
-async function loadDashboard() {
-  const data = await callApi('login');
+
+function renderLeaderboard(list) {
+  if (!list.length) { els.leaderboardList.innerHTML = '<div class="empty-state">目前沒有排行榜資料</div>'; return; }
+  els.leaderboardList.innerHTML = list.map((item, index) => `
+    <div class="list-item leaderboard-item">
+      <div class="leaderboard-left">
+        <div class="leaderboard-rank">#${index + 1}</div>
+        <img class="leaderboard-avatar" src="${escapeHtml(item.avatar_url || 'https://placehold.co/64x64?text=U')}" alt="${escapeHtml(item.display_name)}">
+        <div class="list-title">${escapeHtml(item.display_name)}</div>
+      </div>
+      <div class="list-points">${escapeHtml(item.points)} 點</div>
+    </div>`).join('');
+}
+
+function renderIchibanSummary(events) {
+  if (!events.length) { els.ichibanSummary.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>'; return; }
+  els.ichibanSummary.innerHTML = events.map((event) => `
+    <div class="list-item list-item-stack">
+      <div>
+        <div class="list-title">${escapeHtml(event.title)}</div>
+        <div class="list-subtitle">${escapeHtml(event.points_per_draw ?? event.point_cost)} 點 / 抽 ・ 剩餘 ${escapeHtml(event.remaining_tickets)} / ${escapeHtml(event.total_tickets)} 張</div>
+      </div>
+      <a class="btn btn-primary" href="./ichiban.html?campaignId=${encodeURIComponent(event.id)}">進入活動</a>
+    </div>`).join('');
+}
+
+function renderDashboard(data) {
   state.dashboard = data;
-  renderMember(data);
+  const member = data.member || {};
+  const roleLabel = member.is_admin ? '管理員' : (member.member_role === 'vip' ? 'VIP 會員' : '一般會員');
+  els.authSection.style.display = 'none';
+  els.memberSection.style.display = 'block';
+  els.logoutBtn.style.display = 'inline-flex';
+  els.loginBtn.style.display = 'none';
+  els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
+  els.memberPoints.textContent = String(data.points ?? 0);
+  els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
+  els.nicknameInput.value = member.nickname || member.display_name || '';
+  els.memberRoleBadge.style.display = 'inline-flex';
+  els.memberRoleBadge.textContent = roleLabel;
+  els.memberRoleBadge.className = 'member-role-badge';
+  if (member.is_admin || member.member_role === 'vip') els.memberRoleBadge.classList.add('vip');
+  els.ichibanSection.style.display = (member.is_admin || member.member_role === 'vip') ? 'block' : 'none';
+  els.adminSection.style.display = member.is_admin ? 'block' : 'none';
   renderRewards(data.rewards || []);
   renderRedemptions(data.redemptions || []);
   renderLeaderboard(data.leaderboard || []);
+  if (member.is_admin || member.member_role === 'vip') renderIchibanSummary(data.ichiban_events || []);
 }
-async function signIn() {
-  if (!liff.isLoggedIn()) {
-    liff.login({ redirectUri: getCleanAppUrl() });
-    return;
+
+async function saveNickname() {
+  const key = 'saveNickname';
+  try {
+    startPending(key); setButtonLoading(els.nicknameSaveBtn, true, '更新中...'); clearMessage();
+    const nickname = els.nicknameInput.value.trim();
+    if (!nickname) throw new Error('請輸入暱稱');
+    const result = await callApi('update_nickname', { nickname });
+    showMessage(result.message || '暱稱更新成功');
+    renderDashboard(result);
+  } catch (error) {
+    showMessage(normalizeError(error, '暱稱更新失敗'), true);
+  } finally {
+    endPending(key); setButtonLoading(els.nicknameSaveBtn, false);
   }
+}
+
+async function bootstrapDashboard() { const data = await callApi('login'); renderDashboard(data); }
+async function signIn() {
+  if (!liff.isLoggedIn()) { liff.login({ redirectUri: getCleanAppUrl() }); return; }
   await bootstrap();
 }
-async function signOut() {
+function signOut() {
   if (window.liff && liff.isLoggedIn()) liff.logout();
-  state.accessToken = null;
-  state.dashboard = null;
-  renderLoggedOut();
+  state.accessToken = null; state.dashboard = null;
+  els.authSection.style.display = 'block'; els.memberSection.style.display = 'none'; els.logoutBtn.style.display = 'none'; els.loginBtn.style.display = 'inline-flex'; els.ichibanSection.style.display = 'none'; els.adminSection.style.display = 'none';
   showMessage('已登出');
 }
 async function bootstrap() {
@@ -178,35 +174,18 @@ async function bootstrap() {
     const config = getConfig();
     if (!config.liffId || !config.supabaseUrl || !config.supabaseAnonKey || !config.apiFunctionName) throw new Error('請先設定 config.js');
     await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: false });
-    await loadCampaigns();
     if (!liff.isLoggedIn()) {
-      renderLoggedOut();
+      if (hasLiffRedirectParams()) {
+        const url = new URL(window.location.href); ['code','state','liffClientId','liffRedirectUri'].forEach((k)=>url.searchParams.delete(k)); window.history.replaceState({}, document.title, url.toString());
+      }
       return;
     }
     state.accessToken = liff.getAccessToken();
-    await loadDashboard();
-  } catch (error) {
-    renderLoggedOut();
-    showMessage(normalizeError(error, '初始化失敗'), true);
-  }
+    await bootstrapDashboard();
+  } catch (error) { showMessage(normalizeError(error, '初始化失敗'), true); }
 }
 
 els.loginBtn?.addEventListener('click', signIn);
 els.logoutBtn?.addEventListener('click', signOut);
-els.nicknameSaveBtn?.addEventListener('click', async () => {
-  try {
-    setButtonLoading(els.nicknameSaveBtn, true);
-    clearMessage();
-    const data = await callApi('update_nickname', { nickname: els.nicknameInput.value });
-    state.dashboard = data;
-    renderMember(data);
-    renderLeaderboard(data.leaderboard || []);
-    showMessage(data.message || '暱稱更新成功');
-  } catch (error) {
-    showMessage(normalizeError(error, '更新暱稱失敗'), true);
-  } finally {
-    setButtonLoading(els.nicknameSaveBtn, false);
-  }
-});
-
+els.nicknameSaveBtn?.addEventListener('click', saveNickname);
 bootstrap();
