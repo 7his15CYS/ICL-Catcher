@@ -12,7 +12,7 @@
       <div>
         <p class="eyebrow">線上一番賞</p>
         <h1>ICL 線上一番賞</h1>
-        <p class="hero-text">進入活動後會直接看到全部籤紙。當你點選任一張籤紙並看到結果後，系統會開始保留倒數；倒數內可繼續翻下一張，或主動退出讓出回合。</p>
+        <p class="hero-text">此頁面僅限 VIP 會員與管理員查看。</p>
       </div>
       <div class="header-actions">
         <button id="login-btn" class="btn btn-primary" type="button">使用 LINE 登入</button>
@@ -34,7 +34,17 @@
       </div>
     </section>
 
-    <div class="two-pane kuji-direct-layout">
+
+    <section id="access-denied-section" class="card" style="display:none;">
+      <div class="section-header">
+        <div>
+          <h2>權限不足</h2>
+          <p class="nickname-help" id="access-denied-text">此頁面僅限 VIP 會員與管理員查看。</p>
+        </div>
+      </div>
+    </section>
+
+    <div id="kuji-content" class="two-pane kuji-direct-layout" style="display:none;">
       <section class="card pane-list">
         <div class="section-header">
           <h2>活動列表</h2>
