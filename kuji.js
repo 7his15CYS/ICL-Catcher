@@ -228,7 +228,10 @@ async function loadTicketWall(){
   const data = await callApi('get_kuji_ticket_wall', { campaignId: state.currentCampaignId }, true);
   state.ticketWall = data.tickets || [];
   if(state.currentDetail?.campaign && data.campaign){
-    state.currentDetail.campaign = data.campaign;
+    state.currentDetail.campaign = {
+      ...state.currentDetail.campaign,
+      ...data.campaign,
+    };
   }
   renderTicketWall();
 }
@@ -243,7 +246,12 @@ async function openCampaign(campaignId, silent=false){
   state.currentDetail = detail;
   const wall = await callApi('get_kuji_ticket_wall', { campaignId }, true);
   state.ticketWall = wall.tickets || [];
-  if(detail?.campaign && wall?.campaign) detail.campaign = wall.campaign;
+  if(detail?.campaign && wall?.campaign) {
+    detail.campaign = {
+      ...detail.campaign,
+      ...wall.campaign,
+    };
+  }
   renderCampaignList();
   renderCurrentCampaign();
   const url = new URL(window.location.href);
