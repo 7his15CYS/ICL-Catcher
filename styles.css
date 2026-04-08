@@ -781,3 +781,111 @@ h3 {
 .compact-member-header { gap: 16px; }
 @media (max-width: 1100px) { .admin-layout { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .prize-row { grid-template-columns: 1fr; } }
+
+
+.section-header-tight {
+  margin-bottom: 12px;
+}
+
+.draw-result-summary {
+  margin-bottom: 14px;
+}
+
+.result-summary-card {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: #f5f8fc;
+  border: 1px solid #dce5f0;
+  color: #445c74;
+}
+
+.ticket-board {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.ticket-card {
+  position: relative;
+  min-height: 88px;
+  border-radius: 16px;
+  border: 1px solid #cfd9e5;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 4px 10px rgba(22, 50, 79, 0.05);
+}
+
+.ticket-card:hover {
+  transform: translateY(-1px);
+}
+
+.ticket-face {
+  min-height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.ticket-face-front {
+  background: linear-gradient(180deg, #f7f9fc 0%, #e8eef5 100%);
+  color: #506985;
+  font-weight: 800;
+  font-size: 22px;
+}
+
+.ticket-face-back {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  color: #fff;
+}
+
+.ticket-card.is-revealed .ticket-face-front {
+  display: none;
+}
+
+.ticket-card.is-revealed .ticket-face-back {
+  display: flex;
+}
+
+.ticket-face-back.is-losing {
+  background: linear-gradient(180deg, #111827 0%, #030712 100%);
+}
+
+.ticket-face-back.is-winning {
+  background: linear-gradient(180deg, #f8e7a2 0%, #c9972b 100%);
+  color: #3d2a00;
+}
+
+.ticket-seq {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.ticket-seq-back {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.ticket-result-title {
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.ticket-result-subtitle {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+  .ticket-board {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
