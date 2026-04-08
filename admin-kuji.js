@@ -1,323 +1,39 @@
-function getConfig() { return window.APP_CONFIG || {}; }
-
+function getConfig(){ return window.APP_CONFIG || {}; }
+const state = { accessToken:null, member:null, campaigns:[], currentId:null, currentDetail:null };
 const els = {
-  loginBtn: document.getElementById('login-btn'),
-  logoutBtn: document.getElementById('logout-btn'),
-  messageBox: document.getElementById('message-box'),
-  adminOnlySection: document.getElementById('admin-only-section'),
-  forbiddenSection: document.getElementById('forbidden-section'),
-  editorSection: document.getElementById('editor-section'),
-  ordersSection: document.getElementById('orders-section'),
-  campaignAdminList: document.getElementById('campaign-admin-list'),
-  reloadCampaignsBtn: document.getElementById('reload-campaigns-btn'),
-  newDraftBtn: document.getElementById('new-draft-btn'),
-  editorTitle: document.getElementById('editor-title'),
-  campaignId: document.getElementById('campaign-id'),
-  campaignTitleInput: document.getElementById('campaign-title-input'),
-  pointsPerDrawInput: document.getElementById('points-per-draw-input'),
-  totalTicketsInput: document.getElementById('total-tickets-input'),
-  maxDrawInput: document.getElementById('max-draw-input'),
-  reserveSecondsInput: document.getElementById('reserve-seconds-input'),
-  startsAtInput: document.getElementById('starts-at-input'),
-  endsAtInput: document.getElementById('ends-at-input'),
-  coverImageInput: document.getElementById('cover-image-input'),
-  campaignDescriptionInput: document.getElementById('campaign-description-input'),
-  prizeRows: document.getElementById('prize-rows'),
-  addPrizeRowBtn: document.getElementById('add-prize-row-btn'),
-  saveCampaignBtn: document.getElementById('save-campaign-btn'),
-  publishCampaignBtn: document.getElementById('publish-campaign-btn'),
-  pauseCampaignBtn: document.getElementById('pause-campaign-btn'),
-  activateCampaignBtn: document.getElementById('activate-campaign-btn'),
-  endCampaignBtn: document.getElementById('end-campaign-btn'),
-  reloadOrdersBtn: document.getElementById('reload-orders-btn'),
-  ordersList: document.getElementById('orders-list'),
+  loginBtn: document.getElementById('login-btn'), logoutBtn: document.getElementById('logout-btn'), messageBox: document.getElementById('message-box'),
+  memberSection: document.getElementById('member-section'), memberAvatar: document.getElementById('member-avatar'), memberName: document.getElementById('member-name'),
+  campaignList: document.getElementById('campaign-list'), newCampaignBtn: document.getElementById('new-campaign-btn'), refreshListBtn: document.getElementById('refresh-list-btn'),
+  editorEmpty: document.getElementById('editor-empty'), editorWrap: document.getElementById('editor-wrap'), editorTitle: document.getElementById('editor-title'), editorStatus: document.getElementById('editor-status'),
+  campaignId: document.getElementById('campaign-id'), campaignTitle: document.getElementById('campaign-title'), campaignPointsPerDraw: document.getElementById('campaign-points-per-draw'), campaignTotalTickets: document.getElementById('campaign-total-tickets'), campaignMaxDraw: document.getElementById('campaign-max-draw'), campaignHoldSeconds: document.getElementById('campaign-hold-seconds'), campaignCoverImage: document.getElementById('campaign-cover-image'), campaignStartsAt: document.getElementById('campaign-starts-at'), campaignEndsAt: document.getElementById('campaign-ends-at'), campaignDescription: document.getElementById('campaign-description'),
+  prizeRows: document.getElementById('prize-rows'), addPrizeRowBtn: document.getElementById('add-prize-row-btn'), prizeTotalTip: document.getElementById('prize-total-tip'),
+  saveDraftBtn: document.getElementById('save-draft-btn'), publishBtn: document.getElementById('publish-btn'), pauseBtn: document.getElementById('pause-btn'), activateBtn: document.getElementById('activate-btn'), endBtn: document.getElementById('end-btn'),
+  refreshOrdersBtn: document.getElementById('refresh-orders-btn'), ordersList: document.getElementById('orders-list'),
 };
-
-const state = {
-  accessToken: null,
-  admin: null,
-  campaigns: [],
-  currentCampaign: null,
-  pending: new Set(),
-};
-
-function normalizeError(err, fallback = '發生錯誤') {
-  if (typeof err === 'string') return err;
-  if (err?.message) return err.message;
-  if (err?.error) return err.error;
-  return fallback;
-}
-function escapeHtml(value) {
-  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
-}
-function showMessage(message, isError = false) {
-  const text = message ? normalizeError(message) : '';
-  els.messageBox.textContent = text;
-  els.messageBox.style.display = text ? 'block' : 'none';
-  els.messageBox.className = isError ? 'message error' : 'message success';
-}
-function clearMessage() { showMessage(''); }
-function setButtonLoading(button, isLoading, loadingText = '處理中...') {
-  if (!button) return;
-  if (!button.dataset.originalText) button.dataset.originalText = button.textContent || '';
-  button.disabled = isLoading;
-  button.textContent = isLoading ? loadingText : button.dataset.originalText;
-}
-function startPending(key) { if (state.pending.has(key)) throw new Error('上一個操作尚未完成'); state.pending.add(key); }
-function endPending(key) { state.pending.delete(key); }
-
-async function callApi(action, payload = {}) {
-  const config = getConfig();
-  const res = await fetch(`${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: config.supabaseAnonKey },
-    body: JSON.stringify({ action, accessToken: state.accessToken, ...payload }),
-  });
-  const text = await res.text();
-  let data = {};
-  try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
-  if (!res.ok || data.ok === false) throw data;
-  return data;
-}
-
-function toDatetimeLocalValue(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const tzOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
-}
-function fromDatetimeLocalValue(value) {
-  return value ? new Date(value).toISOString() : null;
-}
-
-function setAdminMode(isAdmin) {
-  els.loginBtn.style.display = isAdmin ? 'none' : 'inline-flex';
-  els.logoutBtn.style.display = state.accessToken ? 'inline-flex' : 'none';
-  els.adminOnlySection.style.display = isAdmin ? 'block' : 'none';
-  els.editorSection.style.display = isAdmin ? 'block' : 'none';
-  els.ordersSection.style.display = isAdmin ? 'block' : 'none';
-  els.forbiddenSection.style.display = isAdmin ? 'none' : 'block';
-}
-
-function emptyPrizeRow(prize = {}) {
-  const row = document.createElement('div');
-  row.className = 'prize-row';
-  row.innerHTML = `
-    <input class="input prize-code" type="text" placeholder="代號 A" value="${escapeHtml(prize.prize_code || '')}">
-    <input class="input prize-name" type="text" placeholder="獎項名稱" value="${escapeHtml(prize.prize_name || '')}">
-    <input class="input prize-qty" type="number" min="1" placeholder="數量" value="${escapeHtml(prize.total_quantity || '')}">
-    <input class="input prize-order" type="number" min="0" placeholder="排序" value="${escapeHtml(prize.display_order || 0)}">
-    <input class="input prize-image" type="text" placeholder="圖片 URL" value="${escapeHtml(prize.prize_image_url || '')}">
-    <button class="btn btn-danger remove-prize-row" type="button">刪除</button>
-  `;
-  row.querySelector('.remove-prize-row').addEventListener('click', () => row.remove());
-  return row;
-}
-
-function collectPrizeRows() {
-  return Array.from(els.prizeRows.querySelectorAll('.prize-row')).map((row) => ({
-    prize_code: row.querySelector('.prize-code').value.trim(),
-    prize_name: row.querySelector('.prize-name').value.trim(),
-    total_quantity: Number(row.querySelector('.prize-qty').value || 0),
-    display_order: Number(row.querySelector('.prize-order').value || 0),
-    prize_image_url: row.querySelector('.prize-image').value.trim() || null,
-  }));
-}
-
-function populateEditor(campaign = null, prizes = []) {
-  state.currentCampaign = campaign;
-  els.editorTitle.textContent = campaign?.id ? `編輯活動 #${campaign.id}` : '新增草稿活動';
-  els.campaignId.value = campaign?.id || '';
-  els.campaignTitleInput.value = campaign?.title || '';
-  els.pointsPerDrawInput.value = campaign?.points_per_draw || '';
-  els.totalTicketsInput.value = campaign?.total_tickets || '';
-  els.maxDrawInput.value = campaign?.max_draw_per_order || 1;
-  els.reserveSecondsInput.value = campaign?.reserve_seconds || 90;
-  els.startsAtInput.value = toDatetimeLocalValue(campaign?.starts_at);
-  els.endsAtInput.value = toDatetimeLocalValue(campaign?.ends_at);
-  els.coverImageInput.value = campaign?.cover_image_url || '';
-  els.campaignDescriptionInput.value = campaign?.description || '';
-  els.prizeRows.innerHTML = '';
-  (prizes.length ? prizes : [{}]).forEach((prize) => els.prizeRows.appendChild(emptyPrizeRow(prize)));
-
-  const status = campaign?.status || 'draft';
-  els.publishCampaignBtn.disabled = !campaign?.id || status !== 'draft';
-  els.pauseCampaignBtn.disabled = !campaign?.id || status !== 'active';
-  els.activateCampaignBtn.disabled = !campaign?.id || !['paused', 'draft'].includes(status);
-  els.endCampaignBtn.disabled = !campaign?.id || status === 'ended';
-}
-
-function renderCampaignList() {
-  if (!state.campaigns.length) {
-    els.campaignAdminList.innerHTML = '<div class="empty-state">目前沒有活動</div>';
-    return;
-  }
-  els.campaignAdminList.innerHTML = state.campaigns.map((campaign) => `
-    <div class="list-item">
-      <div class="list-fill">
-        <div class="list-title">#${campaign.id} ${escapeHtml(campaign.title)}</div>
-        <div class="list-subtitle">${escapeHtml(campaign.status)} ・ ${escapeHtml(campaign.points_per_draw)} 點 / 抽 ・ 剩餘 ${escapeHtml(campaign.remaining_tickets)}</div>
-      </div>
-      <button class="btn btn-secondary load-campaign-btn" type="button" data-id="${campaign.id}">載入</button>
-    </div>
-  `).join('');
-  els.campaignAdminList.querySelectorAll('.load-campaign-btn').forEach((btn) => {
-    btn.addEventListener('click', () => loadCampaignDetail(Number(btn.dataset.id)));
-  });
-}
-
-function renderOrders(orders = []) {
-  if (!orders.length) {
-    els.ordersList.innerHTML = '<div class="empty-state">目前沒有抽獎紀錄</div>';
-    return;
-  }
-  els.ordersList.innerHTML = orders.map((order) => `
-    <div class="list-item block-item">
-      <div class="list-title">${escapeHtml(order.member_nickname || '會員')} ・ ${escapeHtml(order.draw_count)} 抽</div>
-      <div class="list-subtitle">${new Date(order.created_at).toLocaleString('zh-TW')} ・ 扣 ${escapeHtml(order.points_spent)} 點</div>
-      <div class="result-tags">${(order.results || []).map((r) => `<span class="tag">${escapeHtml(r.prize_code)}賞 ${escapeHtml(r.prize_name)}</span>`).join('')}</div>
-    </div>
-  `).join('');
-}
-
-async function loadCampaigns() {
-  const data = await callApi('admin_list_kuji_campaigns');
-  state.campaigns = data.campaigns || [];
-  renderCampaignList();
-}
-
-async function loadCampaignDetail(campaignId) {
-  const [detail, orders] = await Promise.all([
-    callApi('admin_get_kuji_campaign_detail', { campaignId }),
-    callApi('admin_get_kuji_orders', { campaignId }),
-  ]);
-  populateEditor(detail.campaign, detail.prizes || []);
-  renderOrders(orders.orders || []);
-}
-
-async function bootstrap() {
-  try {
-    const config = getConfig();
-    if (!config.liffId || !config.supabaseUrl || !config.supabaseAnonKey || !config.apiFunctionName) {
-      throw new Error('請先設定 config.js');
-    }
-    await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: false });
-    if (!liff.isLoggedIn()) {
-      setAdminMode(false);
-      return;
-    }
-    state.accessToken = liff.getAccessToken();
-    const login = await callApi('login');
-    state.admin = login.member || null;
-    if (!state.admin?.is_admin) {
-      setAdminMode(false);
-      return;
-    }
-    setAdminMode(true);
-    await loadCampaigns();
-    populateEditor();
-  } catch (error) {
-    showMessage(normalizeError(error, '初始化失敗'), true);
-  }
-}
-
-function signIn() {
-  if (!liff.isLoggedIn()) {
-    liff.login({ redirectUri: window.location.href });
-    return;
-  }
-  bootstrap();
-}
-function signOut() {
-  if (liff.isLoggedIn()) liff.logout();
-  state.accessToken = null;
-  state.admin = null;
-  setAdminMode(false);
-  showMessage('已登出');
-}
-
-async function saveCampaign() {
-  const key = 'saveCampaign';
-  try {
-    startPending(key);
-    setButtonLoading(els.saveCampaignBtn, true);
-    const payload = {
-      campaignId: els.campaignId.value ? Number(els.campaignId.value) : null,
-      title: els.campaignTitleInput.value,
-      description: els.campaignDescriptionInput.value,
-      coverImageUrl: els.coverImageInput.value,
-      pointsPerDraw: Number(els.pointsPerDrawInput.value || 0),
-      totalTickets: Number(els.totalTicketsInput.value || 0),
-      maxDrawPerOrder: Number(els.maxDrawInput.value || 0),
-      reserveSeconds: Number(els.reserveSecondsInput.value || 0),
-      startsAt: fromDatetimeLocalValue(els.startsAtInput.value),
-      endsAt: fromDatetimeLocalValue(els.endsAtInput.value),
-      prizes: collectPrizeRows(),
-    };
-    const data = await callApi('admin_save_kuji_campaign', payload);
-    showMessage(data.message || '草稿已儲存');
-    await loadCampaigns();
-    await loadCampaignDetail(Number(data.campaignId));
-  } catch (error) {
-    showMessage(normalizeError(error, '儲存失敗'), true);
-  } finally {
-    endPending(key);
-    setButtonLoading(els.saveCampaignBtn, false);
-  }
-}
-
-async function publishCampaign() {
-  const key = 'publishCampaign';
-  try {
-    startPending(key);
-    setButtonLoading(els.publishCampaignBtn, true);
-    const campaignId = Number(els.campaignId.value || 0);
-    const data = await callApi('admin_publish_kuji_campaign', { campaignId });
-    showMessage(data.message || '活動已上架');
-    await loadCampaigns();
-    await loadCampaignDetail(campaignId);
-  } catch (error) {
-    showMessage(normalizeError(error, '上架失敗'), true);
-  } finally {
-    endPending(key);
-    setButtonLoading(els.publishCampaignBtn, false);
-  }
-}
-
-async function changeStatus(status, button) {
-  const key = `status:${status}`;
-  try {
-    startPending(key);
-    setButtonLoading(button, true);
-    const campaignId = Number(els.campaignId.value || 0);
-    const data = await callApi('admin_change_kuji_campaign_status', { campaignId, status });
-    showMessage(data.message || '活動狀態已更新');
-    await loadCampaigns();
-    await loadCampaignDetail(campaignId);
-  } catch (error) {
-    showMessage(normalizeError(error, '更新狀態失敗'), true);
-  } finally {
-    endPending(key);
-    setButtonLoading(button, false);
-  }
-}
-
-els.loginBtn?.addEventListener('click', signIn);
-els.logoutBtn?.addEventListener('click', signOut);
-els.reloadCampaignsBtn?.addEventListener('click', async () => { await loadCampaigns(); showMessage('活動列表已更新'); });
-els.newDraftBtn?.addEventListener('click', () => { populateEditor(); renderOrders([]); clearMessage(); });
-els.addPrizeRowBtn?.addEventListener('click', () => els.prizeRows.appendChild(emptyPrizeRow()));
-els.saveCampaignBtn?.addEventListener('click', saveCampaign);
-els.publishCampaignBtn?.addEventListener('click', publishCampaign);
-els.pauseCampaignBtn?.addEventListener('click', () => changeStatus('paused', els.pauseCampaignBtn));
-els.activateCampaignBtn?.addEventListener('click', () => changeStatus('active', els.activateCampaignBtn));
-els.endCampaignBtn?.addEventListener('click', () => changeStatus('ended', els.endCampaignBtn));
-els.reloadOrdersBtn?.addEventListener('click', async () => {
-  const id = Number(els.campaignId.value || 0);
-  if (!id) return;
-  const data = await callApi('admin_get_kuji_orders', { campaignId: id });
-  renderOrders(data.orders || []);
-  showMessage('抽獎紀錄已更新');
-});
-bootstrap();
+function escapeHtml(v){ return String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;'); }
+function normalizeError(err,fallback='發生錯誤'){ if(err==null) return fallback; if(typeof err==='string') return err; if(err instanceof Error) return err.message||fallback; if(typeof err==='object') return err.message||err.error||fallback; return String(err); }
+function showMessage(message,isError=false){ const text=normalizeError(message,''); if(!text){ els.messageBox.style.display='none'; return; } els.messageBox.textContent=text; els.messageBox.style.display='block'; els.messageBox.className=isError?'message error':'message success'; }
+function clearMessage(){ showMessage(''); }
+function setButtonLoading(button,loading,label='處理中...'){ if(!button) return; if(!button.dataset.originalText) button.dataset.originalText=button.textContent||''; button.disabled=loading; button.textContent=loading?label:button.dataset.originalText; }
+async function callApi(action,payload={}){ const c=getConfig(); const res=await fetch(`${c.supabaseUrl}/functions/v1/${c.apiFunctionName}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:c.supabaseAnonKey},body:JSON.stringify({action,accessToken:state.accessToken,...payload})}); const text=await res.text(); let data={}; try{data=text?JSON.parse(text):{};}catch{data={message:text};} if(!res.ok||data.ok===false) throw data; return data; }
+function toLocalInputValue(value){ if(!value) return ''; const d=new Date(value); const pad=n=>String(n).padStart(2,'0'); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function fromLocalInputValue(value){ return value ? new Date(value).toISOString() : null; }
+function renderMember(member){ if(!member){ els.memberSection.style.display='none'; els.loginBtn.style.display='inline-flex'; els.logoutBtn.style.display='none'; return; } els.memberSection.style.display='block'; els.loginBtn.style.display='none'; els.logoutBtn.style.display='inline-flex'; els.memberName.textContent = member.nickname || member.display_name || '管理員'; els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=Admin'; }
+function renderCampaignList(){ if(!state.campaigns.length){ els.campaignList.innerHTML='<div class="empty-state">目前沒有活動</div>'; return; } els.campaignList.innerHTML = state.campaigns.map(c=>`<button class="campaign-row ${Number(c.id)===Number(state.currentId)?'active':''}" data-id="${c.id}" type="button"><div class="campaign-row-title">${escapeHtml(c.title)}</div><div class="campaign-row-sub">${escapeHtml(c.status)} ・ ${Number(c.points_per_draw||0)} 點 / 抽 ・ 剩餘 ${Number(c.remaining_tickets||0)}</div></button>`).join(''); els.campaignList.querySelectorAll('.campaign-row').forEach(btn=>btn.addEventListener('click',()=>loadCampaignDetail(Number(btn.dataset.id)))); }
+function createPrizeRow(prize={}){ const row=document.createElement('div'); row.className='prize-row'; row.innerHTML=`<input class="input prize-code" type="text" placeholder="代號，例如 A" value="${escapeHtml(prize.prize_code||'')}" /><input class="input prize-name" type="text" placeholder="獎項名稱" value="${escapeHtml(prize.prize_name||'')}" /><input class="input prize-qty" type="number" min="1" step="1" placeholder="數量" value="${escapeHtml(prize.total_quantity||'')}" /><input class="input prize-order" type="number" min="0" step="1" placeholder="排序" value="${escapeHtml(prize.display_order??0)}" /><input class="input prize-image" type="text" placeholder="圖片 URL" value="${escapeHtml(prize.prize_image_url||'')}" /><button class="btn btn-danger prize-remove-btn" type="button">刪除</button>`; row.querySelector('.prize-remove-btn').addEventListener('click',()=>{ row.remove(); updatePrizeTotalTip(); }); row.querySelectorAll('input').forEach(input=>input.addEventListener('input',updatePrizeTotalTip)); return row; }
+function updatePrizeTotalTip(){ const total = [...els.prizeRows.querySelectorAll('.prize-qty')].reduce((sum,input)=>sum+Number(input.value||0),0); const target = Number(els.campaignTotalTickets.value||0); els.prizeTotalTip.textContent = `獎項總數目前 ${total}，總籤數 ${target}。兩者必須相等。`; els.prizeTotalTip.style.color = total===target ? '#198754' : '#cb3a3a'; }
+function fillEditor(detail){ const c = detail?.campaign || {}; els.editorEmpty.style.display='none'; els.editorWrap.style.display='block'; els.editorTitle.textContent = c.title || '新增草稿'; els.editorStatus.textContent = c.status || 'draft'; els.editorStatus.className = `status-chip ${c.status==='active'?'busy':'idle'}`; els.campaignId.value = c.id || ''; els.campaignTitle.value = c.title || ''; els.campaignPointsPerDraw.value = c.points_per_draw || ''; els.campaignTotalTickets.value = c.total_tickets || ''; els.campaignMaxDraw.value = c.max_draw_per_order || ''; els.campaignHoldSeconds.value = c.turn_hold_seconds ?? c.reserve_seconds ?? ''; els.campaignCoverImage.value = c.cover_image_url || ''; els.campaignStartsAt.value = toLocalInputValue(c.starts_at); els.campaignEndsAt.value = toLocalInputValue(c.ends_at); els.campaignDescription.value = c.description || ''; els.prizeRows.innerHTML=''; (detail?.prizes||[]).forEach(prize=>els.prizeRows.appendChild(createPrizeRow(prize))); if(!(detail?.prizes||[]).length) els.prizeRows.appendChild(createPrizeRow()); updatePrizeTotalTip(); renderOrders([]); updateActionButtons(); }
+function getPrizePayload(){ return [...els.prizeRows.querySelectorAll('.prize-row')].map(row=>({ prize_code: row.querySelector('.prize-code').value.trim(), prize_name: row.querySelector('.prize-name').value.trim(), total_quantity: Number(row.querySelector('.prize-qty').value||0), display_order: Number(row.querySelector('.prize-order').value||0), prize_image_url: row.querySelector('.prize-image').value.trim() || null })).filter(p=>p.prize_code || p.prize_name || p.total_quantity); }
+function getEditorPayload(){ return { campaignId: els.campaignId.value ? Number(els.campaignId.value) : null, title: els.campaignTitle.value.trim(), description: els.campaignDescription.value.trim() || null, coverImageUrl: els.campaignCoverImage.value.trim() || null, pointsPerDraw: Number(els.campaignPointsPerDraw.value || 0), totalTickets: Number(els.campaignTotalTickets.value || 0), maxDrawPerOrder: Number(els.campaignMaxDraw.value || 0), reserveSeconds: Number(els.campaignHoldSeconds.value || 0), startsAt: fromLocalInputValue(els.campaignStartsAt.value), endsAt: fromLocalInputValue(els.campaignEndsAt.value), prizes: getPrizePayload(), }; }
+function updateActionButtons(){ const status = state.currentDetail?.campaign?.status || 'draft'; const hasId = Boolean(els.campaignId.value); els.publishBtn.disabled = !hasId || status !== 'draft'; els.pauseBtn.disabled = !hasId || status !== 'active'; els.activateBtn.disabled = !hasId || status !== 'paused'; els.endBtn.disabled = !hasId || status === 'ended'; }
+function renderOrders(orders){ if(!orders.length){ els.ordersList.innerHTML='<div class="empty-state">目前沒有抽獎紀錄</div>'; return; } els.ordersList.innerHTML = orders.map(order=>`<div class="order-card"><div class="order-head"><div><div class="list-title">${escapeHtml(order.member_nickname || '未知會員')}</div><div class="list-subtitle">${new Date(order.created_at).toLocaleString('zh-TW')} ・ 抽 ${Number(order.draw_count||0)} 張 ・ 扣 ${Number(order.points_spent||0)} 點</div></div></div><div class="order-results">${(order.results||[]).map(r=>`<span class="result-pill">#${Number(r.draw_index||0)} ${escapeHtml(r.prize_code || '')} ${escapeHtml(r.prize_name || '')}（票號 ${escapeHtml(r.ticket_no || '-') }）</span>`).join('')}</div></div>`).join(''); }
+async function loadCampaignList(){ const data = await callApi('admin_list_kuji_campaigns'); state.campaigns = data.campaigns || []; renderCampaignList(); if(state.currentId && state.campaigns.some(c=>Number(c.id)===Number(state.currentId))){ await loadCampaignDetail(state.currentId, true); } }
+async function loadCampaignDetail(id, silent=false){ const data = await callApi('admin_get_kuji_campaign_detail',{campaignId:id}); state.currentId=id; state.currentDetail=data; fillEditor(data); renderCampaignList(); if(!silent) clearMessage(); await loadOrders(true); }
+async function loadOrders(silent=false){ if(!state.currentId){ renderOrders([]); return; } const data = await callApi('admin_get_kuji_orders',{campaignId:state.currentId}); renderOrders(data.orders || []); if(!silent) showMessage('抽獎紀錄已更新'); }
+function newDraft(){ state.currentId=null; state.currentDetail={campaign:{status:'draft'},prizes:[]}; fillEditor(state.currentDetail); }
+async function saveDraft(){ try{ setButtonLoading(els.saveDraftBtn,true); clearMessage(); const payload = getEditorPayload(); const data = await callApi('admin_save_kuji_campaign', payload); showMessage(data.message || '草稿已儲存'); await loadCampaignList(); if(data.campaignId) await loadCampaignDetail(Number(data.campaignId), true); } catch(error){ showMessage(normalizeError(error,'儲存草稿失敗'),true); } finally{ setButtonLoading(els.saveDraftBtn,false); } }
+async function changeStatus(nextStatus, actionName='admin_change_kuji_campaign_status', success='狀態已更新'){ try{ clearMessage(); const data = await callApi(actionName, actionName==='admin_publish_kuji_campaign' ? {campaignId:state.currentId} : {campaignId:state.currentId,status:nextStatus}); showMessage(data.message || success); await loadCampaignList(); await loadCampaignDetail(state.currentId,true); } catch(error){ showMessage(normalizeError(error,success+'失敗'),true); } }
+async function bootstrap(){ try{ const c=getConfig(); if(!c.liffId||!c.supabaseUrl||!c.supabaseAnonKey||!c.apiFunctionName) throw new Error('請先設定 config.js'); await liff.init({liffId:c.liffId,withLoginOnExternalBrowser:false}); if(!liff.isLoggedIn()){ renderMember(null); return; } state.accessToken = liff.getAccessToken(); const data = await callApi('login'); if(!data.member?.is_admin) throw new Error('你不是管理員'); state.member = data.member; renderMember(data.member); await loadCampaignList(); } catch(error){ renderMember(null); showMessage(normalizeError(error,'初始化失敗'),true); } }
+async function signIn(){ if(!liff.isLoggedIn()){ liff.login({redirectUri:window.location.href}); return; } await bootstrap(); }
+async function signOut(){ if(window.liff&&liff.isLoggedIn()) liff.logout(); state.accessToken=null; state.member=null; renderMember(null); showMessage('已登出'); }
+els.loginBtn?.addEventListener('click',signIn); els.logoutBtn?.addEventListener('click',signOut); els.newCampaignBtn?.addEventListener('click',newDraft); els.refreshListBtn?.addEventListener('click',()=>loadCampaignList().catch(e=>showMessage(normalizeError(e,'刷新列表失敗'),true))); els.addPrizeRowBtn?.addEventListener('click',()=>{ els.prizeRows.appendChild(createPrizeRow()); updatePrizeTotalTip(); }); els.campaignTotalTickets?.addEventListener('input',updatePrizeTotalTip); els.saveDraftBtn?.addEventListener('click',saveDraft); els.publishBtn?.addEventListener('click',()=>changeStatus(null,'admin_publish_kuji_campaign','活動已上架')); els.pauseBtn?.addEventListener('click',()=>changeStatus('paused')); els.activateBtn?.addEventListener('click',()=>changeStatus('active')); els.endBtn?.addEventListener('click',()=>changeStatus('ended')); els.refreshOrdersBtn?.addEventListener('click',()=>loadOrders().catch(e=>showMessage(normalizeError(e,'刷新紀錄失敗'),true))); bootstrap();
