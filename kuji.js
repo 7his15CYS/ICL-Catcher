@@ -17,6 +17,9 @@ const els = {
   memberAvatar: document.getElementById('member-avatar'),
   memberName: document.getElementById('member-name'),
   memberPoints: document.getElementById('member-points'),
+  accessDeniedSection: document.getElementById('access-denied-section'),
+  accessDeniedText: document.getElementById('access-denied-text'),
+  kujiContent: document.getElementById('kuji-content'),
   campaignList: document.getElementById('campaign-list'),
   campaignEmpty: document.getElementById('campaign-empty'),
   campaignDetail: document.getElementById('campaign-detail'),
@@ -41,12 +44,22 @@ function makeRequestId(prefix){ return window.crypto?.randomUUID ? `${prefix}-${
 function getCleanAppUrl(){ return `${window.location.origin}${window.location.pathname}${window.location.search}`; }
 async function callApi(action,payload={},includeToken=true){ const c=getConfig(); const body={action,...payload}; if(includeToken && state.accessToken) body.accessToken=state.accessToken; const res=await fetch(`${c.supabaseUrl}/functions/v1/${c.apiFunctionName}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:c.supabaseAnonKey},body:JSON.stringify(body)}); const text=await res.text(); let data={}; try{ data=text?JSON.parse(text):{}; }catch{ data={message:text}; } if(!res.ok||data.ok===false) throw data; return data; }
 function formatTicketNo(v){ return String(v ?? '').padStart(3,'0'); }
+function getMemberRole(member){ return String(member?.member_role || '').toLowerCase(); }
+function canAccessKuji(member){ return Boolean(member && (member.is_admin || getMemberRole(member) === 'vip')); }
+function setKujiVisibility(allowed, message=''){
+  els.kujiContent.style.display = allowed ? 'grid' : 'none';
+  els.accessDeniedSection.style.display = allowed ? 'none' : 'block';
+  if(!allowed && els.accessDeniedText){
+    els.accessDeniedText.textContent = message || '此頁面僅限 VIP 會員與管理員查看。';
+  }
+}
 
 function renderMember(member, points){
   if(!member){
     els.memberSection.style.display='none';
     els.loginBtn.style.display='inline-flex';
     els.logoutBtn.style.display='none';
+    setKujiVisibility(false, '請先使用 LINE 登入，且帳號需為 VIP 會員或管理員，才能查看一番賞活動。');
     return;
   }
   els.memberSection.style.display='block';
@@ -55,6 +68,11 @@ function renderMember(member, points){
   els.memberName.textContent=member.nickname||member.display_name||'LINE 會員';
   els.memberAvatar.src=member.avatar_url||'https://placehold.co/96x96?text=User';
   els.memberPoints.textContent=String(points ?? member.current_points ?? 0);
+  if(canAccessKuji(member)){
+    setKujiVisibility(true);
+  }else{
+    setKujiVisibility(false, '你的帳號目前是一般會員，無法查看一番賞活動。請先由管理員將你設定為 VIP 會員。');
+  }
 }
 
 function renderCampaignList(){
@@ -172,14 +190,24 @@ function renderCurrentCampaign(){
 }
 
 async function loadDashboard(){
-  if(!state.accessToken) return;
+  if(!state.accessToken) return false;
   const data = await callApi('login');
   state.member = data.member;
   renderMember(data.member, data.points);
+  return canAccessKuji(data.member);
 }
 
 async function loadCampaigns(){
-  const data = await callApi('get_kuji_campaigns', {}, false);
+  if(!canAccessKuji(state.member)){
+    state.campaigns = [];
+    state.currentCampaignId = null;
+    state.currentDetail = null;
+    state.ticketWall = [];
+    els.campaignList.innerHTML = '';
+    renderCurrentCampaign();
+    return;
+  }
+  const data = await callApi('get_kuji_campaigns', { accessToken: state.accessToken }, true);
   state.campaigns = data.campaigns || [];
   if(state.currentCampaignId && !state.campaigns.some(c=>Number(c.id)===Number(state.currentCampaignId))){
     state.currentCampaignId = state.campaigns[0] ? Number(state.campaigns[0].id) : null;
@@ -190,8 +218,8 @@ async function loadCampaigns(){
 }
 
 async function loadTicketWall(){
-  if(!state.currentCampaignId) return;
-  const data = await callApi('get_kuji_ticket_wall', { campaignId: state.currentCampaignId }, !!state.accessToken);
+  if(!state.currentCampaignId || !canAccessKuji(state.member)) return;
+  const data = await callApi('get_kuji_ticket_wall', { campaignId: state.currentCampaignId }, true);
   state.ticketWall = data.tickets || [];
   if(state.currentDetail?.campaign && data.campaign){
     state.currentDetail.campaign = data.campaign;
@@ -200,10 +228,14 @@ async function loadTicketWall(){
 }
 
 async function openCampaign(campaignId, silent=false){
+  if(!canAccessKuji(state.member)){
+    setKujiVisibility(false, '你的帳號目前是一般會員，無法查看一番賞活動。請先由管理員將你設定為 VIP 會員。');
+    return;
+  }
   state.currentCampaignId = campaignId;
-  const detail = await callApi('get_kuji_campaign_detail', { campaignId }, !!state.accessToken);
+  const detail = await callApi('get_kuji_campaign_detail', { campaignId }, true);
   state.currentDetail = detail;
-  const wall = await callApi('get_kuji_ticket_wall', { campaignId }, !!state.accessToken);
+  const wall = await callApi('get_kuji_ticket_wall', { campaignId }, true);
   state.ticketWall = wall.tickets || [];
   if(detail?.campaign && wall?.campaign) detail.campaign = wall.campaign;
   renderCampaignList();
@@ -217,6 +249,10 @@ async function openCampaign(campaignId, silent=false){
 async function revealTicket(ticketNo){
   if(!state.accessToken){
     showMessage('請先使用 LINE 登入後再翻開籤紙', true);
+    return;
+  }
+  if(!canAccessKuji(state.member)){
+    showMessage('只有 VIP 會員或管理員可以翻開一番賞籤紙', true);
     return;
   }
   try{
@@ -253,7 +289,7 @@ async function revealTicket(ticketNo){
 }
 
 async function signIn(){ if(!liff.isLoggedIn()){ liff.login({redirectUri:getCleanAppUrl()}); return; } await bootstrap(); }
-async function signOut(){ if(window.liff && liff.isLoggedIn()) liff.logout(); state.accessToken=null; state.member=null; renderMember(null); showMessage('已登出'); }
+async function signOut(){ if(window.liff && liff.isLoggedIn()) liff.logout(); state.accessToken=null; state.member=null; state.campaigns=[]; state.currentCampaignId=null; state.currentDetail=null; state.ticketWall=[]; renderMember(null); els.campaignList.innerHTML=''; renderCurrentCampaign(); showMessage('已登出'); }
 
 async function bootstrap(){
   try{
@@ -262,11 +298,13 @@ async function bootstrap(){
     await liff.init({ liffId:c.liffId, withLoginOnExternalBrowser:false });
     if(liff.isLoggedIn()){
       state.accessToken = liff.getAccessToken();
-      await loadDashboard();
+      const allowed = await loadDashboard();
+      if(allowed){
+        await loadCampaigns();
+      }
     } else {
       renderMember(null);
     }
-    await loadCampaigns();
   }catch(error){
     showMessage(normalizeError(error, '初始化失敗'), true);
   }
