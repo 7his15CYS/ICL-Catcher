@@ -123,7 +123,6 @@ function renderDashboard(data) {
   const member = data.member || {};
   const normalizedRole = String(member.member_role || '').toLowerCase();
   const isVipMember = member.is_admin || normalizedRole === 'vip';
-  const roleLabel = member.is_admin ? '管理員' : (normalizedRole === 'vip' ? 'VIP 會員' : '一般會員');
   els.authSection.style.display = 'none';
   els.memberSection.style.display = 'block';
   els.logoutBtn.style.display = 'inline-flex';
@@ -133,9 +132,16 @@ function renderDashboard(data) {
   els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
   els.nicknameInput.value = member.nickname || member.display_name || '';
   els.memberRoleBadge.style.display = 'inline-flex';
-  els.memberRoleBadge.textContent = roleLabel;
   els.memberRoleBadge.className = 'member-role-badge';
-  if (isVipMember) els.memberRoleBadge.classList.add('vip');
+  if (isVipMember) {
+    els.memberRoleBadge.classList.add('vip');
+    els.memberRoleBadge.innerHTML = `
+      <span class="vip-star" aria-hidden="true">★</span>
+      <span class="vip-text">VIP 會員</span>
+    `;
+  } else {
+    els.memberRoleBadge.textContent = '一般會員';
+  }
   els.ichibanSection.style.display = isVipMember ? 'block' : 'none';
   els.adminSection.style.display = member.is_admin ? 'block' : 'none';
   renderRewards(data.rewards || []);
