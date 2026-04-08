@@ -12,44 +12,46 @@
       <div>
         <p class="eyebrow">會員中心</p>
         <h1>ICL 會員點數中心</h1>
-        <p class="hero-text">查詢點數、兌換商品、進入線上一番賞，都從這裡開始。</p>
+        <p class="hero-text">查點數、改暱稱、兌換商品、進入線上一番賞，都在這裡完成。</p>
       </div>
       <div id="auth-section">
-        <button class="btn btn-primary" id="login-btn" type="button">使用 LINE 登入</button>
+        <button id="login-btn" class="btn btn-primary" type="button">使用 LINE 登入</button>
+        <button id="logout-btn" class="btn btn-secondary" type="button" style="display:none;">登出</button>
       </div>
     </section>
 
     <div id="message-box" class="message" style="display:none;"></div>
 
-    <section class="card" id="member-section" style="display:none;">
+    <section id="member-section" class="card" style="display:none;">
       <div class="member-header">
         <img id="member-avatar" class="member-avatar" src="https://placehold.co/96x96?text=User" alt="會員頭像" />
         <div class="member-info">
           <h2 id="member-name">-</h2>
+          <div id="member-role-badge" class="member-role-badge">一般會員</div>
           <p class="points-label">目前點數</p>
           <div class="points-value"><span id="member-points">0</span> 點</div>
-        </div>
-        <div class="member-actions">
-          <button class="btn btn-secondary" id="logout-btn" type="button" style="display:none;">登出</button>
         </div>
       </div>
 
       <div class="nickname-card">
-        <div class="section-header compact">
+        <div class="nickname-title-row">
           <h3>排行榜顯示名稱</h3>
+          <p class="nickname-help">排行榜只顯示暱稱，不顯示 LINE 真名。</p>
         </div>
-        <div class="row">
-          <input id="nickname-input" class="input" type="text" maxlength="20" placeholder="請輸入你的暱稱" autocomplete="off" />
-          <button class="btn btn-primary" id="nickname-save-btn" type="button">更新暱稱</button>
+        <div class="nickname-form">
+          <input id="nickname-input" class="input" type="text" maxlength="20" placeholder="請輸入你的暱稱" />
+          <button id="nickname-save-btn" class="btn btn-primary" type="button">更新暱稱</button>
         </div>
-        <p class="muted">限制：2~20 字，可用中文、英文、數字、空格、底線、連字號。</p>
       </div>
     </section>
 
-    <section class="card" id="kuji-section">
+    <section class="card">
       <div class="section-header">
         <h2>線上一番賞</h2>
-        <a class="more-link" href="./kuji.html">進入一番賞頁面 →</a>
+        <div class="header-actions">
+          <a class="more-link" href="./kuji.html">進入抽獎頁 →</a>
+          <a id="admin-kuji-link" class="more-link" href="./admin-kuji.html" style="display:none;">管理後台 →</a>
+        </div>
       </div>
       <div id="kuji-summary" class="reward-grid"></div>
     </section>
@@ -70,16 +72,6 @@
     <section class="card">
       <h2>排行榜</h2>
       <div id="leaderboard-list" class="list-wrap"></div>
-    </section>
-
-    <section class="card" id="admin-entry-section" style="display:none;">
-      <div class="section-header">
-        <h2>管理員功能</h2>
-      </div>
-      <div class="admin-entry-box">
-        <p>管理一番賞活動、上架草稿、查看抽獎紀錄。</p>
-        <a class="btn btn-primary" href="./admin-kuji.html">前往一番賞後台</a>
-      </div>
     </section>
   </main>
 
