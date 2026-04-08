@@ -114,7 +114,7 @@ function renderIchibanSummary(events) {
         <div class="list-title">${escapeHtml(event.title)}</div>
         <div class="list-subtitle">${escapeHtml(event.points_per_draw ?? event.point_cost)} 點 / 抽 ・ 剩餘 ${escapeHtml(event.remaining_tickets)} / ${escapeHtml(event.total_tickets)} 張</div>
       </div>
-      <a class="btn btn-primary" href="./ichiban.html?campaignId=${encodeURIComponent(event.id)}">進入活動</a>
+      <a class="btn btn-primary" href="./kuji.html?campaignId=${encodeURIComponent(event.id)}">進入活動</a>
     </div>`).join('');
 }
 
