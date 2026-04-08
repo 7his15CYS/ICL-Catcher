@@ -8,11 +8,11 @@
 </head>
 <body>
   <main class="page admin-page">
-    <section class="hero-card compact-hero">
+    <section class="hero-card compact-hero admin-hero-card">
       <div class="hero-content">
         <p class="eyebrow">管理後台</p>
         <h1>會員點數與一番賞管理</h1>
-        <p class="hero-text">搜尋會員、加點 / 扣點、建立草稿、上架活動與查看抽獎紀錄都在這裡。</p>
+        <p class="hero-text">重新整理成更清楚的三欄工作台：左邊看活動，中間編輯草稿，右邊處理會員點數與搜尋。</p>
       </div>
       <div class="hero-actions" id="auth-section">
         <button class="btn btn-primary" id="login-btn" type="button">使用 LINE 登入</button>
@@ -26,6 +26,7 @@
       <div class="member-header compact-member-header">
         <img id="member-avatar" class="member-avatar" src="https://placehold.co/96x96?text=User" alt="會員頭像" />
         <div class="member-info">
+          <div class="admin-topbar-meta">目前登入</div>
           <h2 id="member-name">-</h2>
           <div class="member-role-badge vip">管理員</div>
         </div>
@@ -33,79 +34,185 @@
       </div>
     </section>
 
-    <div class="admin-layout" id="admin-layout" style="display:none;">
-      <section class="card admin-sidebar-card">
-        <div class="section-header"><h2>活動列表</h2><button class="btn btn-primary" id="new-campaign-btn" type="button">新增草稿</button></div>
-        <button class="btn btn-secondary admin-sidebar-refresh" id="refresh-campaigns-btn" type="button">刷新</button>
-        <div id="campaign-list" class="list-wrap"></div>
-      </section>
+    <div class="admin-layout admin-workspace" id="admin-layout" style="display:none;">
+      <aside class="card admin-sidebar-card admin-panel-soft">
+        <div class="section-header admin-section-title-row">
+          <div>
+            <div class="admin-panel-kicker">Campaigns</div>
+            <h2>活動列表</h2>
+          </div>
+          <button class="btn btn-primary" id="new-campaign-btn" type="button">新增草稿</button>
+        </div>
+        <div class="admin-toolbar-row">
+          <button class="btn btn-secondary admin-sidebar-refresh" id="refresh-campaigns-btn" type="button">刷新列表</button>
+        </div>
+        <div id="campaign-list" class="list-wrap admin-campaign-list"></div>
+      </aside>
 
-      <section class="card admin-main-card">
-        <div class="admin-card-header">
-          <h2 id="editor-title">新增草稿</h2>
+      <section class="card admin-main-card admin-panel-focus">
+        <div class="admin-card-header admin-editor-header">
+          <div>
+            <div class="admin-panel-kicker">Editor</div>
+            <h2 id="editor-title">新增草稿</h2>
+          </div>
           <span class="status-pill" id="campaign-status-pill">draft</span>
         </div>
-        <div class="form-grid two-col">
-          <input type="text" id="campaign-id" class="input" placeholder="活動 ID（新增時留空）" readonly />
-          <input type="text" id="campaign-title" class="input" placeholder="活動名稱" />
-          <input type="number" id="points-per-draw" class="input" placeholder="單抽點數" min="1" step="1" />
-          <input type="number" id="total-tickets" class="input" placeholder="總籤數" min="1" step="1" />
-          <input type="number" id="max-draw-per-order" class="input" placeholder="單次最多抽數" min="1" step="1" />
-          <input type="number" id="turn-hold-seconds" class="input" placeholder="保留秒數" min="1" step="1" />
-          <input type="text" id="cover-image-url" class="input" placeholder="封面圖片 URL" />
-          <input type="datetime-local" id="starts-at" class="input" />
-          <input type="datetime-local" id="ends-at" class="input" />
-        </div>
-        <textarea id="campaign-description" class="input textarea" placeholder="活動說明"></textarea>
 
-        <div class="admin-subcard">
-          <div class="section-header"><h3>獎項設定</h3><button class="btn btn-secondary" id="add-prize-row-btn" type="button">新增獎項列</button></div>
-          <div id="prize-rows" class="prize-rows"></div>
-          <p class="nickname-tip" id="prize-summary">獎項總數 0，總籤數 0，兩者必須相等。</p>
-        </div>
+        <section class="admin-form-section">
+          <div class="section-header compact-section-header">
+            <div>
+              <h3>活動基本資料</h3>
+              <p class="admin-section-desc">先填活動名稱、點數與時間，再往下設定獎項。</p>
+            </div>
+          </div>
 
-        <div class="admin-action-row wrap-row">
-          <button class="btn btn-primary" id="save-campaign-btn" type="button">儲存草稿</button>
-          <button class="btn btn-secondary" id="publish-campaign-btn" type="button">上架活動</button>
-          <button class="btn btn-secondary" id="pause-campaign-btn" type="button">暫停</button>
-          <button class="btn btn-secondary" id="resume-campaign-btn" type="button">恢復上架</button>
-          <button class="btn btn-danger" id="end-campaign-btn" type="button">結束活動</button>
-        </div>
+          <div class="form-grid two-col admin-form-grid">
+            <label class="field-card field-card-full field-card-readonly">
+              <span class="field-label">活動 ID</span>
+              <input type="text" id="campaign-id" class="input" placeholder="新增草稿時系統自動產生" readonly />
+            </label>
 
-        <div class="admin-subcard">
-          <div class="section-header"><h3>抽獎紀錄</h3><button class="btn btn-secondary" id="refresh-orders-btn" type="button">刷新紀錄</button></div>
-          <div id="order-list" class="list-wrap"></div>
-        </div>
+            <label class="field-card field-card-full">
+              <span class="field-label">活動名稱</span>
+              <input type="text" id="campaign-title" class="input" placeholder="例如：鬼滅之刃一番賞" />
+            </label>
+
+            <label class="field-card">
+              <span class="field-label">單抽點數</span>
+              <input type="number" id="points-per-draw" class="input" placeholder="請輸入點數" min="1" step="1" />
+            </label>
+
+            <label class="field-card">
+              <span class="field-label">總籤數</span>
+              <input type="number" id="total-tickets" class="input" placeholder="請輸入總籤數" min="1" step="1" />
+            </label>
+
+            <label class="field-card">
+              <span class="field-label">單次最多抽數</span>
+              <input type="number" id="max-draw-per-order" class="input" placeholder="請手動輸入" min="1" step="1" />
+              <span class="field-help">不再預設 1，避免誤存。</span>
+            </label>
+
+            <label class="field-card">
+              <span class="field-label">保留秒數</span>
+              <input type="number" id="turn-hold-seconds" class="input" placeholder="請手動輸入" min="1" step="1" />
+              <span class="field-help">不再預設 30，避免誤存。</span>
+            </label>
+
+            <label class="field-card field-card-full">
+              <span class="field-label">封面圖片 URL</span>
+              <input type="text" id="cover-image-url" class="input" placeholder="https://..." />
+            </label>
+
+            <label class="field-card">
+              <span class="field-label">開始時間</span>
+              <input type="datetime-local" id="starts-at" class="input" />
+            </label>
+
+            <label class="field-card">
+              <span class="field-label">結束時間</span>
+              <input type="datetime-local" id="ends-at" class="input" />
+            </label>
+          </div>
+
+          <label class="field-card field-card-full field-card-textarea">
+            <span class="field-label">活動說明</span>
+            <textarea id="campaign-description" class="input textarea" placeholder="輸入活動介紹、抽獎規則、注意事項"></textarea>
+          </label>
+        </section>
+
+        <section class="admin-form-section admin-prize-section">
+          <div class="section-header compact-section-header">
+            <div>
+              <h3>獎項設定</h3>
+              <p class="admin-section-desc">每列都有明確標籤，避免看不到欄位內容。</p>
+            </div>
+            <button class="btn btn-secondary" id="add-prize-row-btn" type="button">新增獎項列</button>
+          </div>
+          <div id="prize-rows" class="prize-rows prize-rows-card"></div>
+          <p class="nickname-tip admin-summary-text" id="prize-summary">獎項總數 0，總籤數 0，兩者必須相等。</p>
+        </section>
+
+        <section class="admin-form-section">
+          <div class="section-header compact-section-header">
+            <div>
+              <h3>活動操作</h3>
+              <p class="admin-section-desc">先儲存草稿，再依需要上架、暫停或結束活動。</p>
+            </div>
+          </div>
+          <div class="admin-action-row wrap-row admin-action-grid">
+            <button class="btn btn-primary" id="save-campaign-btn" type="button">儲存草稿</button>
+            <button class="btn btn-secondary" id="publish-campaign-btn" type="button">上架活動</button>
+            <button class="btn btn-secondary" id="pause-campaign-btn" type="button">暫停</button>
+            <button class="btn btn-secondary" id="resume-campaign-btn" type="button">恢復上架</button>
+            <button class="btn btn-danger" id="end-campaign-btn" type="button">結束活動</button>
+          </div>
+        </section>
+
+        <section class="admin-form-section admin-orders-section">
+          <div class="section-header compact-section-header">
+            <div>
+              <h3>抽獎紀錄</h3>
+              <p class="admin-section-desc">選擇活動後顯示最新抽獎紀錄。</p>
+            </div>
+            <button class="btn btn-secondary" id="refresh-orders-btn" type="button">刷新紀錄</button>
+          </div>
+          <div id="order-list" class="list-wrap admin-order-list"></div>
+        </section>
       </section>
 
-      <section class="card admin-right-card">
-        <div class="section-header"><h2>會員管理</h2></div>
-        <div class="row">
-          <input type="text" id="member-search-input" class="input" placeholder="輸入會員名稱或暱稱" />
-          <button class="btn btn-secondary" id="member-search-btn" type="button">搜尋</button>
+      <aside class="card admin-right-card admin-panel-soft">
+        <div class="section-header admin-section-title-row">
+          <div>
+            <div class="admin-panel-kicker">Members</div>
+            <h2>會員管理</h2>
+          </div>
         </div>
-        <div id="member-search-results" class="list-wrap"></div>
 
-        <div class="admin-subcard">
-          <h3>手動加點</h3>
+        <section class="admin-form-section admin-member-search-section">
+          <div class="compact-section-header compact-stack-header">
+            <div>
+              <h3>搜尋會員</h3>
+              <p class="admin-section-desc">輸入名稱或暱稱後，可快速帶入會員 ID。</p>
+            </div>
+          </div>
+          <div class="row admin-search-row">
+            <input type="text" id="member-search-input" class="input" placeholder="輸入會員名稱或暱稱" />
+            <button class="btn btn-secondary" id="member-search-btn" type="button">搜尋</button>
+          </div>
+          <div id="member-search-results" class="list-wrap"></div>
+        </section>
+
+        <section class="admin-form-section admin-points-box admin-points-box-plus">
+          <div class="compact-section-header compact-stack-header">
+            <div>
+              <h3>手動加點</h3>
+              <p class="admin-section-desc">帶入會員 ID 後，再填點數與原因。</p>
+            </div>
+          </div>
           <div class="form-grid single-col">
-            <input type="text" id="grant-member-id" class="input" placeholder="會員 ID" />
-            <input type="number" id="grant-points" class="input" placeholder="加點點數" min="1" step="1" />
-            <input type="text" id="grant-reason" class="input" placeholder="加點原因" maxlength="100" />
+            <label class="field-card"><span class="field-label">會員 ID</span><input type="text" id="grant-member-id" class="input" placeholder="請輸入會員 ID" /></label>
+            <label class="field-card"><span class="field-label">加點點數</span><input type="number" id="grant-points" class="input" placeholder="請輸入點數" min="1" step="1" /></label>
+            <label class="field-card"><span class="field-label">加點原因</span><input type="text" id="grant-reason" class="input" placeholder="例如：活動參與獎勵" maxlength="100" /></label>
           </div>
           <button class="btn btn-primary" id="grant-points-btn" type="button">確認加點</button>
-        </div>
+        </section>
 
-        <div class="admin-subcard">
-          <h3>手動扣點</h3>
+        <section class="admin-form-section admin-points-box admin-points-box-minus">
+          <div class="compact-section-header compact-stack-header">
+            <div>
+              <h3>手動扣點</h3>
+              <p class="admin-section-desc">扣點前可先搜尋會員確認目前點數。</p>
+            </div>
+          </div>
           <div class="form-grid single-col">
-            <input type="text" id="deduct-member-id" class="input" placeholder="會員 ID" />
-            <input type="number" id="deduct-points" class="input" placeholder="扣點點數" min="1" step="1" />
-            <input type="text" id="deduct-reason" class="input" placeholder="扣點原因" maxlength="100" />
+            <label class="field-card"><span class="field-label">會員 ID</span><input type="text" id="deduct-member-id" class="input" placeholder="請輸入會員 ID" /></label>
+            <label class="field-card"><span class="field-label">扣點點數</span><input type="number" id="deduct-points" class="input" placeholder="請輸入點數" min="1" step="1" /></label>
+            <label class="field-card"><span class="field-label">扣點原因</span><input type="text" id="deduct-reason" class="input" placeholder="例如：人工修正" maxlength="100" /></label>
           </div>
           <button class="btn btn-danger" id="deduct-points-btn" type="button">確認扣點</button>
-        </div>
-      </section>
+        </section>
+      </aside>
     </div>
   </main>
 
