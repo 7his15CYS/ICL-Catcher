@@ -7,12 +7,12 @@
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
-  <main class="page kuji-page">
+  <main class="page kuji-page kuji-page-direct">
     <section class="hero-card">
       <div>
         <p class="eyebrow">線上一番賞</p>
-        <h1>ICL 會員點數中心</h1>
-        <p class="hero-text">先取得本活動的抽籤回合，再決定要抽幾張。正式抽籤後會一次產生對應數量的籤紙，會員可逐張點開查看結果。</p>
+        <h1>ICL 線上一番賞</h1>
+        <p class="hero-text">進入活動後會直接看到整面籤紙。點任一張籤即可立即翻開結果，未中獎為黑底白字，中獎為金底黑字。</p>
       </div>
       <div class="header-actions">
         <button id="login-btn" class="btn btn-primary" type="button">使用 LINE 登入</button>
@@ -34,8 +34,8 @@
       </div>
     </section>
 
-    <div class="two-pane">
-      <section class="card pane-list">
+    <div class="two-pane two-pane-wide">
+      <section class="card pane-list pane-list-compact">
         <div class="section-header">
           <h2>活動列表</h2>
           <button id="refresh-campaigns-btn" class="btn btn-secondary" type="button">重新整理</button>
@@ -43,51 +43,43 @@
         <div id="campaign-list" class="list-wrap"></div>
       </section>
 
-      <section class="card pane-detail">
+      <section class="card pane-detail pane-detail-focus">
         <div id="campaign-empty" class="empty-state">請先從左側選擇活動</div>
         <div id="campaign-detail" style="display:none;">
-          <div class="section-header">
-            <h2 id="campaign-title">-</h2>
+          <div class="section-header section-header-top">
+            <div>
+              <h2 id="campaign-title">-</h2>
+              <p id="campaign-description" class="muted campaign-description"></p>
+            </div>
             <span id="campaign-status-badge" class="status-chip idle">未開始</span>
           </div>
-          <img id="campaign-image" class="hero-banner" src="https://placehold.co/1200x600?text=KUJI" alt="活動封面" />
-          <p id="campaign-description" class="muted"></p>
-          <div id="campaign-stats" class="stat-grid"></div>
 
-          <div class="turn-box">
-            <div>
-              <h3>抽籤回合</h3>
-              <p id="turn-status-text" class="muted">尚未取得回合</p>
-            </div>
-            <div class="turn-actions">
-              <div id="turn-countdown" class="countdown">-</div>
-              <button id="claim-turn-btn" class="btn btn-primary" type="button">開始抽籤</button>
-              <button id="release-turn-btn" class="btn btn-secondary" type="button">放棄回合</button>
+          <div class="kuji-banner-row">
+            <img id="campaign-image" class="kuji-cover" src="https://placehold.co/800x420?text=KUJI" alt="活動封面" />
+            <div class="kuji-side-panel">
+              <div id="campaign-stats" class="stat-grid stat-grid-compact"></div>
+              <div class="ticket-legend">
+                <span class="legend-chip legend-closed">未翻開</span>
+                <span class="legend-chip legend-lose">未中獎</span>
+                <span class="legend-chip legend-win">中獎</span>
+              </div>
+              <div id="ticket-hint" class="ticket-hint">請先登入，登入後可直接點籤翻牌。</div>
+              <div id="turn-status-inline" class="ticket-turn-status muted"></div>
             </div>
           </div>
 
-          <div class="draw-box">
-            <div class="inline-form">
-              <label for="draw-count-input">抽幾張</label>
-              <input id="draw-count-input" class="input small" type="number" min="1" step="1" value="1" />
-              <button id="draw-btn" class="btn btn-primary" type="button">正式抽籤</button>
-              <button id="refresh-detail-btn" class="btn btn-secondary" type="button">刷新狀態</button>
+          <section class="detail-block detail-block-emphasis">
+            <div class="section-header">
+              <h3>抽籤籤紙</h3>
+              <div id="ticket-progress" class="ticket-progress">-</div>
             </div>
-            <p class="nickname-help">正式抽籤後，系統會一次顯示本次抽出的所有籤紙。點擊籤紙即可翻開；未中獎會顯示黑底，有中獎會顯示金底與獎品內容。</p>
-          </div>
+            <p class="ticket-wall-note">直接點任一張可抽的籤紙即可翻開。若目前有人正在操作，系統會依回合保護限制暫時鎖定。</p>
+            <div id="ticket-wall" class="ticket-wall"></div>
+          </section>
 
           <section class="detail-block">
             <h3>獎項剩餘</h3>
             <div id="prize-list" class="prize-grid"></div>
-          </section>
-
-          <section class="detail-block">
-            <div class="section-header section-header-tight">
-              <h3>本次抽獎結果</h3>
-              <button id="reveal-all-btn" class="btn btn-secondary" type="button" style="display:none;">全部翻開</button>
-            </div>
-            <div id="draw-result-summary" class="draw-result-summary"></div>
-            <div id="draw-result-box" class="ticket-board"><div class="empty-state">尚未抽獎</div></div>
           </section>
         </div>
       </section>
