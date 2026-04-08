@@ -90,7 +90,13 @@ function renderPrizeList(prizes){
     ? list.map((p) => {
         const remaining = Number(p.remaining_quantity || 0);
         const total = Number(p.total_quantity || 0);
-        const ratio = total > 0 ? Math.max(0, Math.min(100, Math.round((remaining / total) * 100))) : 0;
+
+        // 進度條改為顯示「已抽走比例」
+        const drawn = Math.max(0, total - remaining);
+        const ratio = total > 0
+          ? Math.max(0, Math.min(100, Math.round((drawn / total) * 100)))
+          : 0;
+
         const isSoldOut = total > 0 && remaining <= 0;
         const title = escapeHtml(p.prize_name || '未命名獎項');
         const code = escapeHtml(p.prize_code || '獎項');
@@ -112,7 +118,7 @@ function renderPrizeList(prizes){
               ${sameText ? '' : `<div class="prize-subtitle">${title}</div>`}
               <div class="prize-progress" aria-hidden="true"><span style="width:${ratio}%"></span></div>
               <div class="prize-meta">
-                <span>剩餘 ${remaining} / 共 ${total}</span>
+                <span>已抽 ${drawn} / 共 ${total}</span>
                 <span>${ratio}%</span>
               </div>
             </div>
