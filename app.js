@@ -121,7 +121,9 @@ function renderIchibanSummary(events) {
 function renderDashboard(data) {
   state.dashboard = data;
   const member = data.member || {};
-  const roleLabel = member.is_admin ? '管理員' : (member.member_role === 'vip' ? 'VIP 會員' : '一般會員');
+  const normalizedRole = String(member.member_role || '').toLowerCase();
+  const isVipMember = member.is_admin || normalizedRole === 'vip';
+  const roleLabel = member.is_admin ? '管理員' : (normalizedRole === 'vip' ? 'VIP 會員' : '一般會員');
   els.authSection.style.display = 'none';
   els.memberSection.style.display = 'block';
   els.logoutBtn.style.display = 'inline-flex';
@@ -133,13 +135,17 @@ function renderDashboard(data) {
   els.memberRoleBadge.style.display = 'inline-flex';
   els.memberRoleBadge.textContent = roleLabel;
   els.memberRoleBadge.className = 'member-role-badge';
-  if (member.is_admin || member.member_role === 'vip') els.memberRoleBadge.classList.add('vip');
-  els.ichibanSection.style.display = (member.is_admin || member.member_role === 'vip') ? 'block' : 'none';
+  if (isVipMember) els.memberRoleBadge.classList.add('vip');
+  els.ichibanSection.style.display = isVipMember ? 'block' : 'none';
   els.adminSection.style.display = member.is_admin ? 'block' : 'none';
   renderRewards(data.rewards || []);
   renderRedemptions(data.redemptions || []);
   renderLeaderboard(data.leaderboard || []);
-  if (member.is_admin || member.member_role === 'vip') renderIchibanSummary(data.ichiban_events || []);
+  if (isVipMember) {
+    renderIchibanSummary(data.ichiban_events || []);
+  } else {
+    els.ichibanSummary.innerHTML = '';
+  }
 }
 
 async function saveNickname() {
