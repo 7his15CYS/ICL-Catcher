@@ -19,7 +19,11 @@ const els = {
 };
 
 const state = { accessToken: null, dashboard: null, pending: new Set() };
-function getConfig() { return window.APP_CONFIG || {}; }
+
+function getConfig() {
+  return window.APP_CONFIG || {};
+}
+
 function normalizeError(err, fallback = '發生錯誤') {
   if (err == null) return fallback;
   if (typeof err === 'string') return err;
@@ -27,9 +31,16 @@ function normalizeError(err, fallback = '發生錯誤') {
   if (typeof err === 'object') return err.message || err.error || fallback;
   return String(err);
 }
+
 function escapeHtml(value) {
-  return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
+
 function normalizeCategory(value) {
   const category = String(value ?? '').trim();
   return category || '兌換商品';
@@ -37,21 +48,39 @@ function normalizeCategory(value) {
 
 function showMessage(message, isError = false) {
   const text = typeof message === 'string' ? message : normalizeError(message);
-  if (!text) { els.messageBox.style.display = 'none'; return; }
+  if (!text) {
+    els.messageBox.style.display = 'none';
+    return;
+  }
   els.messageBox.textContent = text;
   els.messageBox.style.display = 'block';
   els.messageBox.className = isError ? 'message error' : 'message success';
 }
-function clearMessage() { showMessage(''); }
+
+function clearMessage() {
+  showMessage('');
+}
+
 function setButtonLoading(button, isLoading, loadingText = '處理中...') {
   if (!button) return;
   if (!button.dataset.originalText) button.dataset.originalText = button.textContent || '';
   button.disabled = isLoading;
   button.textContent = isLoading ? loadingText : button.dataset.originalText;
 }
-function startPending(key) { if (state.pending.has(key)) throw new Error('上一個操作尚未完成'); state.pending.add(key); }
-function endPending(key) { state.pending.delete(key); }
-function getCleanAppUrl() { return `${window.location.origin}${window.location.pathname}`; }
+
+function startPending(key) {
+  if (state.pending.has(key)) throw new Error('上一個操作尚未完成');
+  state.pending.add(key);
+}
+
+function endPending(key) {
+  state.pending.delete(key);
+}
+
+function getCleanAppUrl() {
+  return `${window.location.origin}${window.location.pathname}`;
+}
+
 function hasLiffRedirectParams() {
   const url = new URL(window.location.href);
   return url.searchParams.has('code') || url.searchParams.has('state') || url.searchParams.has('liffClientId') || url.searchParams.has('liffRedirectUri');
@@ -64,16 +93,58 @@ async function callApi(action, payload = {}) {
     headers: { 'Content-Type': 'application/json', apikey: config.supabaseAnonKey },
     body: JSON.stringify({ action, accessToken: state.accessToken, ...payload }),
   });
+
   const text = await res.text();
   let data = {};
-  try { data = text ? JSON.parse(text) : {}; } catch { data = { message: text }; }
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { message: text };
+  }
+
   if (!res.ok || data.ok === false) throw data;
   return data;
 }
 
+function toSafeNumber(value, fallback = Number.MAX_SAFE_INTEGER) {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function getFeaturedRewards(rewards = []) {
+  const featured = rewards
+    .filter((reward) => reward?.is_featured === true)
+    .sort((a, b) => {
+      const orderDiff = toSafeNumber(a.featured_order) - toSafeNumber(b.featured_order);
+      if (orderDiff !== 0) return orderDiff;
+      const pointsDiff = toSafeNumber(a.points_cost, 0) - toSafeNumber(b.points_cost, 0);
+      if (pointsDiff !== 0) return pointsDiff;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant');
+    })
+    .slice(0, 3);
+
+  if (featured.length > 0) {
+    return featured;
+  }
+
+  return [...rewards]
+    .sort((a, b) => {
+      const pointsDiff = toSafeNumber(a.points_cost, 0) - toSafeNumber(b.points_cost, 0);
+      if (pointsDiff !== 0) return pointsDiff;
+      return String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant');
+    })
+    .slice(0, 3);
+}
+
 function renderRewards(rewards) {
-  if (!rewards.length) { els.rewardsList.innerHTML = '<div class="empty-state">目前沒有可兌換獎品</div>'; return; }
-  els.rewardsList.innerHTML = rewards.map((reward) => `
+  const featuredRewards = getFeaturedRewards(rewards);
+
+  if (!featuredRewards.length) {
+    els.rewardsList.innerHTML = '<div class="empty-state">目前沒有可顯示的精選獎品</div>';
+    return;
+  }
+
+  els.rewardsList.innerHTML = featuredRewards.map((reward) => `
     <article class="reward-card">
       <img class="reward-image" src="${escapeHtml(reward.image_url || 'https://placehold.co/600x400?text=Reward')}" alt="${escapeHtml(reward.name)}">
       <div class="reward-body">
@@ -87,7 +158,10 @@ function renderRewards(rewards) {
 }
 
 function renderRedemptions(redemptions) {
-  if (!redemptions.length) { els.redemptionList.innerHTML = '<div class="empty-state">你還沒有兌換紀錄</div>'; return; }
+  if (!redemptions.length) {
+    els.redemptionList.innerHTML = '<div class="empty-state">你還沒有兌換紀錄</div>';
+    return;
+  }
   els.redemptionList.innerHTML = redemptions.map((item) => `
     <div class="list-item">
       <div>
@@ -99,7 +173,10 @@ function renderRedemptions(redemptions) {
 }
 
 function renderLeaderboard(list) {
-  if (!list.length) { els.leaderboardList.innerHTML = '<div class="empty-state">目前沒有排行榜資料</div>'; return; }
+  if (!list.length) {
+    els.leaderboardList.innerHTML = '<div class="empty-state">目前沒有排行榜資料</div>';
+    return;
+  }
   els.leaderboardList.innerHTML = list.map((item, index) => `
     <div class="list-item leaderboard-item">
       <div class="leaderboard-left">
@@ -112,7 +189,10 @@ function renderLeaderboard(list) {
 }
 
 function renderIchibanSummary(events) {
-  if (!events.length) { els.ichibanSummary.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>'; return; }
+  if (!events.length) {
+    els.ichibanSummary.innerHTML = '<div class="empty-state">目前沒有上架中的一番賞活動</div>';
+    return;
+  }
   els.ichibanSummary.innerHTML = events.map((event) => `
     <div class="list-item list-item-stack">
       <div>
@@ -128,6 +208,7 @@ function renderDashboard(data) {
   const member = data.member || {};
   const normalizedRole = String(member.member_role || '').toLowerCase();
   const isVipMember = member.is_admin || normalizedRole === 'vip';
+
   els.authSection.style.display = 'none';
   els.memberSection.style.display = 'block';
   els.logoutBtn.style.display = 'inline-flex';
@@ -138,6 +219,7 @@ function renderDashboard(data) {
   els.nicknameInput.value = member.nickname || member.display_name || '';
   els.memberRoleBadge.style.display = 'inline-flex';
   els.memberRoleBadge.className = 'member-role-badge';
+
   if (isVipMember) {
     els.memberRoleBadge.classList.add('vip');
     els.memberRoleBadge.innerHTML = `
@@ -147,11 +229,14 @@ function renderDashboard(data) {
   } else {
     els.memberRoleBadge.textContent = '一般會員';
   }
+
   els.ichibanSection.style.display = isVipMember ? 'block' : 'none';
   els.adminSection.style.display = member.is_admin ? 'block' : 'none';
+
   renderRewards(data.rewards || []);
   renderRedemptions(data.redemptions || []);
   renderLeaderboard(data.leaderboard || []);
+
   if (isVipMember) {
     renderIchibanSummary(data.ichiban_events || []);
   } else {
@@ -162,44 +247,71 @@ function renderDashboard(data) {
 async function saveNickname() {
   const key = 'saveNickname';
   try {
-    startPending(key); setButtonLoading(els.nicknameSaveBtn, true, '更新中...'); clearMessage();
+    startPending(key);
+    setButtonLoading(els.nicknameSaveBtn, true, '更新中...');
+    clearMessage();
+
     const nickname = els.nicknameInput.value.trim();
     if (!nickname) throw new Error('請輸入暱稱');
+
     const result = await callApi('update_nickname', { nickname });
     showMessage(result.message || '暱稱更新成功');
     renderDashboard(result);
   } catch (error) {
     showMessage(normalizeError(error, '暱稱更新失敗'), true);
   } finally {
-    endPending(key); setButtonLoading(els.nicknameSaveBtn, false);
+    endPending(key);
+    setButtonLoading(els.nicknameSaveBtn, false);
   }
 }
 
-async function bootstrapDashboard() { const data = await callApi('login'); renderDashboard(data); }
+async function bootstrapDashboard() {
+  const data = await callApi('login');
+  renderDashboard(data);
+}
+
 async function signIn() {
-  if (!liff.isLoggedIn()) { liff.login({ redirectUri: getCleanAppUrl() }); return; }
+  if (!liff.isLoggedIn()) {
+    liff.login({ redirectUri: getCleanAppUrl() });
+    return;
+  }
   await bootstrap();
 }
+
 function signOut() {
   if (window.liff && liff.isLoggedIn()) liff.logout();
-  state.accessToken = null; state.dashboard = null;
-  els.authSection.style.display = 'block'; els.memberSection.style.display = 'none'; els.logoutBtn.style.display = 'none'; els.loginBtn.style.display = 'inline-flex'; els.ichibanSection.style.display = 'none'; els.adminSection.style.display = 'none';
+  state.accessToken = null;
+  state.dashboard = null;
+  els.authSection.style.display = 'block';
+  els.memberSection.style.display = 'none';
+  els.logoutBtn.style.display = 'none';
+  els.loginBtn.style.display = 'inline-flex';
+  els.ichibanSection.style.display = 'none';
+  els.adminSection.style.display = 'none';
   showMessage('已登出');
 }
+
 async function bootstrap() {
   try {
     const config = getConfig();
     if (!config.liffId || !config.supabaseUrl || !config.supabaseAnonKey || !config.apiFunctionName) throw new Error('請先設定 config.js');
+
     await liff.init({ liffId: config.liffId, withLoginOnExternalBrowser: false });
+
     if (!liff.isLoggedIn()) {
       if (hasLiffRedirectParams()) {
-        const url = new URL(window.location.href); ['code','state','liffClientId','liffRedirectUri'].forEach((k)=>url.searchParams.delete(k)); window.history.replaceState({}, document.title, url.toString());
+        const url = new URL(window.location.href);
+        ['code', 'state', 'liffClientId', 'liffRedirectUri'].forEach((k) => url.searchParams.delete(k));
+        window.history.replaceState({}, document.title, url.toString());
       }
       return;
     }
+
     state.accessToken = liff.getAccessToken();
     await bootstrapDashboard();
-  } catch (error) { showMessage(normalizeError(error, '初始化失敗'), true); }
+  } catch (error) {
+    showMessage(normalizeError(error, '初始化失敗'), true);
+  }
 }
 
 els.loginBtn?.addEventListener('click', signIn);
