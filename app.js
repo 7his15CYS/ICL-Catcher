@@ -30,6 +30,11 @@ function normalizeError(err, fallback = '發生錯誤') {
 function escapeHtml(value) {
   return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;');
 }
+function normalizeCategory(value) {
+  const category = String(value ?? '').trim();
+  return category || '兌換商品';
+}
+
 function showMessage(message, isError = false) {
   const text = typeof message === 'string' ? message : normalizeError(message);
   if (!text) { els.messageBox.style.display = 'none'; return; }
@@ -72,7 +77,7 @@ function renderRewards(rewards) {
     <article class="reward-card">
       <img class="reward-image" src="${escapeHtml(reward.image_url || 'https://placehold.co/600x400?text=Reward')}" alt="${escapeHtml(reward.name)}">
       <div class="reward-body">
-        <span class="reward-category">${escapeHtml(reward.category || '兌換商品')}</span>
+        <span class="reward-category">${escapeHtml(normalizeCategory(reward.category))}</span>
         <h3>${escapeHtml(reward.name)}</h3>
         <p>${escapeHtml(reward.description || '暫無說明')}</p>
         <div class="reward-meta"><span>${escapeHtml(reward.points_cost)} 點</span><span>庫存 ${escapeHtml(reward.stock)}</span></div>
