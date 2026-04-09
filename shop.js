@@ -299,13 +299,13 @@ async function redeemReward(rewardId, button) {
       throw new Error('請先登入後再兌換');
     }
 
-    await callApi('redeem', {
+    const result = await callApi('redeem', {
       memberId: state.dashboard.member.id,
       rewardId,
-      requestId: makeRequestId('redeem'),
+      requestId: makeRequestId(`redeem-${rewardId}`),
     });
-
-    showMessage('兌換成功');
+    
+    showMessage(result.message || '兌換成功');
     await bootstrapDashboard();
   } catch (error) {
     console.error('redeemReward error =', error);
