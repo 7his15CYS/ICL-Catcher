@@ -188,12 +188,18 @@ function renderMember(data) {
   }
 }
 
+
+function normalizeCategory(value) {
+  const category = String(value ?? '').trim();
+  return category || '未分類';
+}
+
 function getCategoriesFromRewards(rewards = []) {
   const categories = Array.from(
     new Set(
       rewards
-        .map((item) => String(item.category || '').trim())
-        .filter(Boolean)
+        .map((item) => normalizeCategory(item.category))
+        .filter((category) => category !== '未分類')
     )
   );
 
@@ -239,7 +245,7 @@ function renderShopRewards() {
     state.selectedCategory === '全部'
       ? state.allRewards
       : state.allRewards.filter(
-          (item) => String(item.category || '未分類') === state.selectedCategory
+          (item) => normalizeCategory(item.category) === state.selectedCategory
         );
 
   if (els.shopSectionTitle) {
@@ -264,7 +270,7 @@ function renderShopRewards() {
         <div class="reward-card">
           <img class="reward-image" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(reward.name)}">
           <div class="reward-body">
-            <span class="reward-category">${escapeHtml(reward.category || '未分類')}</span>
+            <span class="reward-category">${escapeHtml(normalizeCategory(reward.category))}</span>
             <h3>${escapeHtml(reward.name)}</h3>
             <p>${escapeHtml(reward.description || '')}</p>
             <div class="reward-meta">
