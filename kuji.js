@@ -351,7 +351,10 @@ async function loadCampaigns(){
 
 async function loadTicketWall(){
   if(!state.currentCampaignId || !canAccessKuji(state.member)) return;
-  const data = await callApi('get_kuji_ticket_wall', { campaignId: state.currentCampaignId }, true);
+  const data = await callApi('get_kuji_ticket_wall', {
+    campaignId: state.currentCampaignId,
+    accessToken: state.accessToken,
+  }, true);
   state.ticketWall = data.tickets || [];
   if(state.currentDetail?.campaign && data.campaign){
     state.currentDetail.campaign = {
@@ -365,8 +368,14 @@ async function loadTicketWall(){
 async function refreshCurrentCampaignState({ silent=false } = {}){
   if(!state.currentCampaignId || !canAccessKuji(state.member)) return;
   const [detail, wall] = await Promise.all([
-    callApi('get_kuji_campaign_detail', { campaignId: state.currentCampaignId }, true),
-    callApi('get_kuji_ticket_wall', { campaignId: state.currentCampaignId }, true),
+    callApi('get_kuji_campaign_detail', {
+      campaignId: state.currentCampaignId,
+      accessToken: state.accessToken,
+    }, true),
+    callApi('get_kuji_ticket_wall', {
+      campaignId: state.currentCampaignId,
+      accessToken: state.accessToken,
+    }, true),
   ]);
   state.currentDetail = detail;
   applyTurnFromDetail(detail);
@@ -388,8 +397,15 @@ async function openCampaign(campaignId, silent=false){
     return;
   }
   state.currentCampaignId = campaignId;
-  const detail = await callApi('get_kuji_campaign_detail', { campaignId }, true);
-  const wall = await callApi('get_kuji_ticket_wall', { campaignId }, true);
+  const detail = await callApi('get_kuji_campaign_detail', {
+    campaignId,
+    accessToken: state.accessToken,
+  }, true);
+  
+  const wall = await callApi('get_kuji_ticket_wall', {
+    campaignId,
+    accessToken: state.accessToken,
+  }, true);
   state.currentDetail = detail;
   applyTurnFromDetail(detail);
   state.ticketWall = wall.tickets || [];
