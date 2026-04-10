@@ -2553,3 +2553,13 @@ h3 {
   color: #0f172a !important;
   opacity: 1 !important;
 }
+
+.page > .card:last-of-type::before {
+  content: none !important;
+  display: none !important;
+}
+
+#shop-rewards-list .reward-card::before {
+  content: none !important;
+  display: none !important;
+}
