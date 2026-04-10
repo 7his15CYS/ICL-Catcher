@@ -243,13 +243,15 @@ function renderMember(data) {
   }
 
   if (els.memberAvatar) {
-    els.memberAvatar.src =
-      member.avatar_url ||
-      member.picture_url ||
-      'https://placehold.co/96x96?text=User';
+    els.memberAvatar.src = getMemberAvatarUrl(member);
   }
 }
 
+function getMemberAvatarUrl(member) {
+  if (!member) return 'https://placehold.co/96x96?text=User';
+  if (member.is_admin && member.picture_url) return member.picture_url;
+  return member.avatar_url || member.picture_url || 'https://placehold.co/96x96?text=User';
+}
 
 function normalizeCategory(value) {
   const category = String(value ?? '').trim();
