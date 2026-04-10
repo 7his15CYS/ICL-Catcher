@@ -184,7 +184,7 @@ function renderRewards(rewards) {
         <h3>${escapeHtml(reward.name)}</h3>
         <p>${escapeHtml(reward.description || '暫無說明')}</p>
         <div class="reward-meta"><span>${escapeHtml(reward.points_cost)} 點</span><span>庫存 ${escapeHtml(reward.stock)}</span></div>
-        <a class="btn btn-secondary" href="./shop.html">前往兌換</a>
+        <a class="btn btn-secondary" href="./shop.html" target="_blank" rel="noopener noreferrer">前往兌換</a>
       </div>
     </article>`).join('');
 }
@@ -231,7 +231,7 @@ function renderIchibanSummary(events) {
         <div class="list-title">${escapeHtml(event.title)}</div>
         <div class="list-subtitle">${escapeHtml(event.points_per_draw ?? event.point_cost)} 點 / 抽 ・ 剩餘 ${escapeHtml(event.remaining_tickets)} / ${escapeHtml(event.total_tickets)} 張</div>
       </div>
-      <a class="btn btn-primary" href="./kuji.html?campaignId=${encodeURIComponent(event.id)}">進入活動</a>
+      <a class="btn btn-primary" href="./kuji.html?campaignId=${encodeURIComponent(event.id)}" target="_blank" rel="noopener noreferrer">進入活動</a>
     </div>`).join('');
 }
 
