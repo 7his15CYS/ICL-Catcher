@@ -97,43 +97,15 @@ function makeRequestId(prefix) {
   return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function setButtonLoading(button, isLoading, loadingText = '處理中...') {
-  if (!button) return;
-
-  if (!button.dataset.originalText) {
-    button.dataset.originalText = button.textContent || '';
-  }
-
-  button.disabled = isLoading;
-  button.classList.toggle('is-loading', isLoading);
-  button.textContent = isLoading ? loadingText : button.dataset.originalText;
-}
-
-function startPending(key) {
-  if (state.pending.has(key)) {
-    throw new Error('上一個操作尚未完成，請稍候');
-  }
-  state.pending.add(key);
-}
-
-function endPending(key) {
-  state.pending.delete(key);
-}
-
 function isTokenExpiredError(error) {
   const message = normalizeError(error, '').toLowerCase();
   return (
     message.includes('access token expired') ||
     message.includes('invalid access token') ||
     message.includes('line access token 驗證失敗') ||
+    message.includes('line profile 取得失敗') ||
     message.includes('token expired')
   );
-}
-
-function resetAuthState() {
-  state.accessToken = null;
-  state.profile = null;
-  state.dashboard = null;
 }
 
 async function refreshAccessToken(forceRelogin = false) {
@@ -181,24 +153,38 @@ async function refreshAccessToken(forceRelogin = false) {
   }
 }
 
+function setButtonLoading(button, isLoading, loadingText = '處理中...') {
+  if (!button) return;
+
+  if (!button.dataset.originalText) {
+    button.dataset.originalText = button.textContent || '';
+  }
+
+  button.disabled = isLoading;
+  button.classList.toggle('is-loading', isLoading);
+  button.textContent = isLoading ? loadingText : button.dataset.originalText;
+}
+
+function startPending(key) {
+  if (state.pending.has(key)) {
+    throw new Error('上一個操作尚未完成，請稍候');
+  }
+  state.pending.add(key);
+}
+
+function endPending(key) {
+  state.pending.delete(key);
+}
+
 async function callApi(action, payload = {}, options = {}) {
   const config = getConfig();
+  const { retryOnExpiredToken = true } = options;
 
   if (!config.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
   if (!config.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
   if (!config.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
 
-  const {
-    retryOnExpiredToken = true,
-  } = options;
-
   const url = `${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`;
-
-  const requestBody = {
-    action,
-    accessToken: state.accessToken,
-    ...payload,
-  };
 
   const res = await fetch(url, {
     method: 'POST',
@@ -206,7 +192,11 @@ async function callApi(action, payload = {}, options = {}) {
       'Content-Type': 'application/json',
       apikey: config.supabaseAnonKey,
     },
-    body: JSON.stringify(requestBody),
+    body: JSON.stringify({
+      action,
+      accessToken: state.accessToken,
+      ...payload,
+    }),
   });
 
   const text = await res.text();
@@ -259,6 +249,7 @@ function renderMember(data) {
       'https://placehold.co/96x96?text=User';
   }
 }
+
 
 function normalizeCategory(value) {
   const category = String(value ?? '').trim();
@@ -381,7 +372,7 @@ async function redeemReward(rewardId, button) {
       rewardId,
       requestId: makeRequestId(`redeem-${rewardId}`),
     });
-
+    
     showMessage(result.message || '兌換成功');
     await bootstrapDashboard();
   } catch (error) {
@@ -395,7 +386,7 @@ async function redeemReward(rewardId, button) {
 
 async function loadPublicData() {
   try {
-    const data = await callApi('get_public_leaderboard', {}, { retryOnExpiredToken: false });
+    const data = await callApi('get_public_leaderboard');
     state.allRewards = data.rewards || [];
     renderCategoryTabs();
     renderShopRewards();
@@ -429,7 +420,6 @@ async function signIn() {
       return;
     }
 
-    await refreshAccessToken();
     await bootstrap();
   } catch (error) {
     console.error('signIn error =', error);
@@ -445,7 +435,10 @@ async function signOut() {
       liff.logout();
     }
 
-    resetAuthState();
+    state.accessToken = null;
+    state.profile = null;
+    state.dashboard = null;
+    state.isRefreshingToken = false;
     state.pending.clear();
 
     renderLoggedOut();
@@ -482,7 +475,6 @@ async function bootstrap() {
     }
 
     if (!liff.isLoggedIn()) {
-      resetAuthState();
       renderLoggedOut();
       return;
     }
@@ -491,7 +483,6 @@ async function bootstrap() {
     await bootstrapDashboard();
   } catch (error) {
     console.error('bootstrap error =', error);
-    resetAuthState();
     renderLoggedOut();
     showMessage(`初始化失敗：${normalizeError(error)}`, true);
   } finally {
