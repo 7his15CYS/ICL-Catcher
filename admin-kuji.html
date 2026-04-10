@@ -30,7 +30,10 @@
           <h2 id="member-name">-</h2>
           <div class="member-role-badge vip">管理員</div>
         </div>
-        <div class="member-actions"><button class="btn btn-secondary" id="logout-btn" type="button">登出</button></div>
+        <div class="member-actions">
+          <a class="btn btn-secondary" href="./index.html">返回會員中心</a>
+          <button class="btn btn-secondary" id="logout-btn" type="button">登出</button>
+        </div>
       </div>
     </section>
 
@@ -214,6 +217,12 @@
         </section>
       </aside>
     </div>
+
+    <section class="card admin-bottom-nav" id="admin-bottom-nav" style="display:none;">
+      <div class="admin-action-row">
+        <a class="btn btn-secondary" href="./index.html">← 返回會員中心</a>
+      </div>
+    </section>
   </main>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
