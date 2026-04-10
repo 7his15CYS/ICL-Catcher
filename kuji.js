@@ -21,6 +21,7 @@ const els = {
   memberAvatar: document.getElementById('member-avatar'),
   memberName: document.getElementById('member-name'),
   memberPoints: document.getElementById('member-points'),
+  memberRoleBadge: document.getElementById('member-role-badge'),
   accessDeniedSection: document.getElementById('access-denied-section'),
   accessDeniedText: document.getElementById('access-denied-text'),
   kujiContent: document.getElementById('kuji-content'),
@@ -54,7 +55,38 @@ function getCleanAppUrl(){ return `${window.location.origin}${window.location.pa
 async function callApi(action,payload={},includeToken=true){ const c=getConfig(); const body={action,...payload}; if(includeToken && state.accessToken) body.accessToken=state.accessToken; const res=await fetch(`${c.supabaseUrl}/functions/v1/${c.apiFunctionName}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:c.supabaseAnonKey},body:JSON.stringify(body)}); const text=await res.text(); let data={}; try{ data=text?JSON.parse(text):{}; }catch{ data={message:text}; } if(!res.ok||data.ok===false) throw data; return data; }
 function formatTicketNo(v){ return String(v ?? '').padStart(3,'0'); }
 function getMemberRole(member){ return String(member?.member_role || '').toLowerCase(); }
-function canAccessKuji(member){ return Boolean(member && (member.is_admin || getMemberRole(member) === 'vip')); }
+function getMemberBadge(member){
+  if(!member){
+    return {
+      access: false,
+      className: 'member-role-badge',
+      html: '<span class="role-text">一般會員</span>',
+    };
+  }
+
+  if(member.is_admin){
+    return {
+      access: true,
+      className: 'member-role-badge admin',
+      html: '<span class="role-icon" aria-hidden="true">🛡</span><span class="role-text">管理員</span>',
+    };
+  }
+
+  if(getMemberRole(member) === 'vip'){
+    return {
+      access: true,
+      className: 'member-role-badge vip',
+      html: '<span class="vip-star" aria-hidden="true">★</span><span class="vip-text">VIP 會員</span>',
+    };
+  }
+
+  return {
+    access: false,
+    className: 'member-role-badge',
+    html: '<span class="role-text">一般會員</span>',
+  };
+}
+function canAccessKuji(member){ return getMemberBadge(member).access; }
 function setKujiVisibility(allowed, message=''){
   els.kujiContent.style.display = allowed ? 'grid' : 'none';
   els.accessDeniedSection.style.display = allowed ? 'none' : 'block';
@@ -182,10 +214,16 @@ function renderMember(member, points){
   els.memberSection.style.display='block';
   els.loginBtn.style.display='none';
   els.logoutBtn.style.display='inline-flex';
+  const badge = getMemberBadge(member);
   els.memberName.textContent=member.nickname||member.display_name||'LINE 會員';
   els.memberAvatar.src=member.avatar_url||'https://placehold.co/96x96?text=User';
   els.memberPoints.textContent=String(points ?? member.current_points ?? 0);
-  if(canAccessKuji(member)){
+  if(els.memberRoleBadge){
+    els.memberRoleBadge.style.display='inline-flex';
+    els.memberRoleBadge.className=badge.className;
+    els.memberRoleBadge.innerHTML=badge.html;
+  }
+  if(badge.access){
     setKujiVisibility(true);
     ensurePollTimer();
   }else{
