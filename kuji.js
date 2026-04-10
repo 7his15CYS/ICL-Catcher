@@ -88,6 +88,11 @@ async function refreshAccessToken(forceRelogin=false){
 }
 async function callApi(action,payload={},includeToken=true,options={}){ const c=getConfig(); const { retryOnExpiredToken=true } = options; const body={action,...payload}; if(includeToken && state.accessToken) body.accessToken=state.accessToken; const res=await fetch(`${c.supabaseUrl}/functions/v1/${c.apiFunctionName}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:c.supabaseAnonKey},body:JSON.stringify(body)}); const text=await res.text(); let data={}; try{ data=text?JSON.parse(text):{}; }catch{ data={message:text}; } if(!res.ok||data.ok===false){ if(retryOnExpiredToken && isTokenExpiredError(data)){ await refreshAccessToken(true); return await callApi(action,payload,includeToken,{ retryOnExpiredToken:false }); } throw data; } return data; }
 function formatTicketNo(v){ return String(v ?? '').padStart(3,'0'); }
+function getMemberAvatarUrl(member){
+  if(!member) return 'https://placehold.co/96x96?text=User';
+  if(member.is_admin && member.picture_url) return member.picture_url;
+  return member.avatar_url || member.picture_url || 'https://placehold.co/96x96?text=User';
+}
 function getMemberRole(member){ return String(member?.member_role || '').toLowerCase(); }
 function getMemberBadge(member){
   if(!member){
@@ -250,7 +255,7 @@ function renderMember(member, points){
   els.logoutBtn.style.display='inline-flex';
   const badge = getMemberBadge(member);
   els.memberName.textContent=member.nickname||member.display_name||'LINE 會員';
-  els.memberAvatar.src=member.avatar_url||'https://placehold.co/96x96?text=User';
+  els.memberAvatar.src=getMemberAvatarUrl(member);
   els.memberPoints.textContent=String(points ?? member.current_points ?? 0);
   if(els.memberRoleBadge){
     els.memberRoleBadge.style.display='inline-flex';
