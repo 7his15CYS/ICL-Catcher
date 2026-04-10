@@ -2553,3 +2553,46 @@ h3 {
   color: #0f172a !important;
   opacity: 1 !important;
 }
+
+
+/* ===== shop rewards first-row overlay fix ===== */
+.shop-rewards-section,
+#rewardsSection {
+  background: #f8fafc !important;
+  background-image: none !important;
+}
+
+.shop-rewards-section::before,
+#rewardsSection::before,
+.shop-rewards-section.card::before,
+#rewardsSection.card::before {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+
+.shop-rewards-section > .section-header,
+#rewardsSection > .section-header {
+  position: relative;
+  z-index: 3;
+  background: #f8fafc !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+.shop-rewards-section > .section-header h2,
+#rewardsSection > .section-header h2,
+.shop-rewards-section #shop-section-title,
+#rewardsSection #shop-section-title {
+  color: #0f172a !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+
+.shop-rewards-section .reward-grid,
+#rewardsSection .reward-grid,
+.shop-rewards-section .reward-card,
+#rewardsSection .reward-card {
+  position: relative;
+  z-index: 3;
+}
