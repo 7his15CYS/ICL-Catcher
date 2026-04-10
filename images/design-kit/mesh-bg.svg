@@ -1,0 +1,26 @@
+<svg width="1600" height="1200" viewBox="0 0 1600 1200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="1200" fill="#08111F"/>
+  <g filter="url(#f1)">
+    <circle cx="250" cy="180" r="220" fill="#7C3AED" fill-opacity="0.45"/>
+    <circle cx="1180" cy="220" r="240" fill="#22C55E" fill-opacity="0.28"/>
+    <circle cx="860" cy="760" r="300" fill="#38BDF8" fill-opacity="0.22"/>
+    <circle cx="1350" cy="920" r="240" fill="#F59E0B" fill-opacity="0.22"/>
+  </g>
+  <g opacity="0.22" stroke="white">
+    <path d="M0 160H1600"/>
+    <path d="M0 360H1600"/>
+    <path d="M0 560H1600"/>
+    <path d="M0 760H1600"/>
+    <path d="M0 960H1600"/>
+    <path d="M180 0V1200"/>
+    <path d="M480 0V1200"/>
+    <path d="M780 0V1200"/>
+    <path d="M1080 0V1200"/>
+    <path d="M1380 0V1200"/>
+  </g>
+  <defs>
+    <filter id="f1" x="-150" y="-220" width="1900" height="1660" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="120"/>
+    </filter>
+  </defs>
+</svg>
