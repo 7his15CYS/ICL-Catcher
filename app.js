@@ -41,6 +41,12 @@ function escapeHtml(value) {
     .replaceAll("'", '&#39;');
 }
 
+function getMemberAvatarUrl(member) {
+  if (!member) return 'https://placehold.co/96x96?text=User';
+  if (member.is_admin && member.picture_url) return member.picture_url;
+  return member.avatar_url || member.picture_url || 'https://placehold.co/96x96?text=User';
+}
+
 function normalizeCategory(value) {
   const category = String(value ?? '').trim();
   return category || '兌換商品';
@@ -301,7 +307,7 @@ function renderDashboard(data) {
   els.loginBtn.style.display = 'none';
   els.memberName.textContent = member.nickname || member.display_name || 'LINE 會員';
   els.memberPoints.textContent = String(data.points ?? 0);
-  els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
+  els.memberAvatar.src = getMemberAvatarUrl(member);
   els.nicknameInput.value = member.nickname || member.display_name || '';
   els.memberRoleBadge.style.display = 'inline-flex';
   els.memberRoleBadge.className = badge.className;
