@@ -26,6 +26,7 @@ const state = {
   allRewards: [],
   selectedCategory: '全部',
   isBootstrapping: false,
+  isRefreshingToken: false,
   pending: new Set(),
 };
 
@@ -119,14 +120,85 @@ function endPending(key) {
   state.pending.delete(key);
 }
 
-async function callApi(action, payload = {}) {
+function isTokenExpiredError(error) {
+  const message = normalizeError(error, '').toLowerCase();
+  return (
+    message.includes('access token expired') ||
+    message.includes('invalid access token') ||
+    message.includes('line access token 驗證失敗') ||
+    message.includes('token expired')
+  );
+}
+
+function resetAuthState() {
+  state.accessToken = null;
+  state.profile = null;
+  state.dashboard = null;
+}
+
+async function refreshAccessToken(forceRelogin = false) {
+  if (!window.liff) {
+    throw new Error('LIFF SDK 尚未載入');
+  }
+
+  if (state.isRefreshingToken) {
+    throw new Error('LINE 登入資訊更新中，請稍後再試');
+  }
+
+  state.isRefreshingToken = true;
+
+  try {
+    if (forceRelogin && liff.isLoggedIn()) {
+      try {
+        liff.logout();
+      } catch (logoutError) {
+        console.warn('LIFF logout failed before relogin:', logoutError);
+      }
+    }
+
+    if (!liff.isLoggedIn()) {
+      liff.login({ redirectUri: getCleanAppUrl() });
+      throw new Error('正在重新導向 LINE 登入，請稍候');
+    }
+
+    const accessToken = liff.getAccessToken();
+    if (!accessToken) {
+      liff.login({ redirectUri: getCleanAppUrl() });
+      throw new Error('LINE 登入已失效，正在重新登入');
+    }
+
+    state.accessToken = accessToken;
+
+    try {
+      state.profile = await liff.getProfile();
+    } catch (profileError) {
+      console.warn('LIFF getProfile failed while refreshing token:', profileError);
+    }
+
+    return accessToken;
+  } finally {
+    state.isRefreshingToken = false;
+  }
+}
+
+async function callApi(action, payload = {}, options = {}) {
   const config = getConfig();
 
   if (!config.supabaseUrl) throw new Error('config.js 尚未設定 supabaseUrl');
   if (!config.supabaseAnonKey) throw new Error('config.js 尚未設定 supabaseAnonKey');
   if (!config.apiFunctionName) throw new Error('config.js 尚未設定 apiFunctionName');
 
+  const {
+    retryOnExpiredToken = true,
+  } = options;
+
   const url = `${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`;
+
+  const requestBody = {
+    action,
+    accessToken: state.accessToken,
+    ...payload,
+  };
 
   const res = await fetch(url, {
     method: 'POST',
@@ -134,11 +206,7 @@ async function callApi(action, payload = {}) {
       'Content-Type': 'application/json',
       apikey: config.supabaseAnonKey,
     },
-    body: JSON.stringify({
-      action,
-      accessToken: state.accessToken,
-      ...payload,
-    }),
+    body: JSON.stringify(requestBody),
   });
 
   const text = await res.text();
@@ -151,6 +219,10 @@ async function callApi(action, payload = {}) {
   }
 
   if (!res.ok || data.ok === false) {
+    if (retryOnExpiredToken && isTokenExpiredError(data)) {
+      await refreshAccessToken(true);
+      return await callApi(action, payload, { retryOnExpiredToken: false });
+    }
     throw data;
   }
 
@@ -187,7 +259,6 @@ function renderMember(data) {
       'https://placehold.co/96x96?text=User';
   }
 }
-
 
 function normalizeCategory(value) {
   const category = String(value ?? '').trim();
@@ -310,7 +381,7 @@ async function redeemReward(rewardId, button) {
       rewardId,
       requestId: makeRequestId(`redeem-${rewardId}`),
     });
-    
+
     showMessage(result.message || '兌換成功');
     await bootstrapDashboard();
   } catch (error) {
@@ -324,7 +395,7 @@ async function redeemReward(rewardId, button) {
 
 async function loadPublicData() {
   try {
-    const data = await callApi('get_public_leaderboard');
+    const data = await callApi('get_public_leaderboard', {}, { retryOnExpiredToken: false });
     state.allRewards = data.rewards || [];
     renderCategoryTabs();
     renderShopRewards();
@@ -358,6 +429,7 @@ async function signIn() {
       return;
     }
 
+    await refreshAccessToken();
     await bootstrap();
   } catch (error) {
     console.error('signIn error =', error);
@@ -373,9 +445,7 @@ async function signOut() {
       liff.logout();
     }
 
-    state.accessToken = null;
-    state.profile = null;
-    state.dashboard = null;
+    resetAuthState();
     state.pending.clear();
 
     renderLoggedOut();
@@ -412,17 +482,16 @@ async function bootstrap() {
     }
 
     if (!liff.isLoggedIn()) {
+      resetAuthState();
       renderLoggedOut();
       return;
     }
 
-    state.accessToken = liff.getAccessToken();
-    if (!state.accessToken) throw new Error('無法取得 LINE access token');
-
-    state.profile = await liff.getProfile();
+    await refreshAccessToken();
     await bootstrapDashboard();
   } catch (error) {
     console.error('bootstrap error =', error);
+    resetAuthState();
     renderLoggedOut();
     showMessage(`初始化失敗：${normalizeError(error)}`, true);
   } finally {
