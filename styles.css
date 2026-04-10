@@ -2596,3 +2596,40 @@ h3 {
   position: relative;
   z-index: 3;
 }
+
+/* ===== member profile mobile centering fix ===== */
+@media (max-width: 768px) {
+  .member-header,
+  .member-header.compact,
+  .compact-member-header {
+    flex-direction: column;
+    align-items: center !important;
+    text-align: center;
+  }
+
+  .member-avatar {
+    display: block;
+    margin: 0 auto;
+  }
+
+  .member-info {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .member-info h2,
+  .points-label,
+  .points-value {
+    text-align: center;
+  }
+
+  .member-actions {
+    width: 100%;
+    margin-left: 0;
+    display: flex;
+    justify-content: center;
+  }
+}
