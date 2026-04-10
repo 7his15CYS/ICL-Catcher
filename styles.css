@@ -2527,3 +2527,29 @@ h3 {
     margin-bottom: 18px;
   }
 }
+
+/* 取消「全部商品」區塊上方白色漸層遮罩 */
+#rewardsSection::before,
+#rewardsSection.card::before {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+
+/* 讓全部商品區塊維持乾淨底色 */
+#rewardsSection,
+#rewardsSection.card {
+  background: #f8fafc !important;
+  background-image: none !important;
+}
+
+/* 讓「全部商品」標題保持清楚 */
+#rewardsSection .section-header,
+#rewardsSection h2 {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  color: #0f172a !important;
+  opacity: 1 !important;
+}
