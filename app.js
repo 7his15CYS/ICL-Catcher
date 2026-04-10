@@ -18,7 +18,7 @@ const els = {
   adminSection: document.getElementById('admin-section'),
 };
 
-const state = { accessToken: null, dashboard: null, pending: new Set() };
+const state = { accessToken: null, dashboard: null, pending: new Set(), isRefreshingToken: false };
 
 function getConfig() {
   return window.APP_CONFIG || {};
@@ -81,13 +81,61 @@ function getCleanAppUrl() {
   return `${window.location.origin}${window.location.pathname}`;
 }
 
+function isTokenExpiredError(error) {
+  const message = normalizeError(error, '').toLowerCase();
+  return (
+    message.includes('access token expired') ||
+    message.includes('invalid access token') ||
+    message.includes('line access token 驗證失敗') ||
+    message.includes('line profile 取得失敗') ||
+    message.includes('token expired')
+  );
+}
+
+async function refreshAccessToken(forceRelogin = false) {
+  if (!window.liff) throw new Error('LIFF SDK 尚未載入');
+
+  if (state.isRefreshingToken) {
+    throw new Error('LINE 登入資訊更新中，請稍後再試');
+  }
+
+  state.isRefreshingToken = true;
+  try {
+    if (forceRelogin && liff.isLoggedIn()) {
+      try {
+        liff.logout();
+      } catch (logoutError) {
+        console.warn('LIFF logout failed before relogin:', logoutError);
+      }
+    }
+
+    if (!liff.isLoggedIn()) {
+      liff.login({ redirectUri: getCleanAppUrl() });
+      throw new Error('LINE 登入已失效，正在重新登入');
+    }
+
+    const accessToken = liff.getAccessToken();
+    if (!accessToken) {
+      liff.login({ redirectUri: getCleanAppUrl() });
+      throw new Error('無法取得新的 LINE access token，正在重新登入');
+    }
+
+    state.accessToken = accessToken;
+    return accessToken;
+  } finally {
+    state.isRefreshingToken = false;
+  }
+}
+
 function hasLiffRedirectParams() {
   const url = new URL(window.location.href);
   return url.searchParams.has('code') || url.searchParams.has('state') || url.searchParams.has('liffClientId') || url.searchParams.has('liffRedirectUri');
 }
 
-async function callApi(action, payload = {}) {
+async function callApi(action, payload = {}, options = {}) {
   const config = getConfig();
+  const { retryOnExpiredToken = true } = options;
+
   const res = await fetch(`${config.supabaseUrl}/functions/v1/${config.apiFunctionName}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', apikey: config.supabaseAnonKey },
@@ -102,7 +150,13 @@ async function callApi(action, payload = {}) {
     data = { message: text };
   }
 
-  if (!res.ok || data.ok === false) throw data;
+  if (!res.ok || data.ok === false) {
+    if (retryOnExpiredToken && isTokenExpiredError(data)) {
+      await refreshAccessToken(true);
+      return await callApi(action, payload, { retryOnExpiredToken: false });
+    }
+    throw data;
+  }
   return data;
 }
 
@@ -184,7 +238,7 @@ function renderRewards(rewards) {
         <h3>${escapeHtml(reward.name)}</h3>
         <p>${escapeHtml(reward.description || '暫無說明')}</p>
         <div class="reward-meta"><span>${escapeHtml(reward.points_cost)} 點</span><span>庫存 ${escapeHtml(reward.stock)}</span></div>
-        <a class="btn btn-secondary" href="./shop.html" target="_blank" rel="noopener noreferrer">前往兌換</a>
+        <a class="btn btn-secondary" href="./shop.html">前往兌換</a>
       </div>
     </article>`).join('');
 }
@@ -231,7 +285,7 @@ function renderIchibanSummary(events) {
         <div class="list-title">${escapeHtml(event.title)}</div>
         <div class="list-subtitle">${escapeHtml(event.points_per_draw ?? event.point_cost)} 點 / 抽 ・ 剩餘 ${escapeHtml(event.remaining_tickets)} / ${escapeHtml(event.total_tickets)} 張</div>
       </div>
-      <a class="btn btn-primary" href="./kuji.html?campaignId=${encodeURIComponent(event.id)}" target="_blank" rel="noopener noreferrer">進入活動</a>
+      <a class="btn btn-primary" href="./kuji.html?campaignId=${encodeURIComponent(event.id)}">進入活動</a>
     </div>`).join('');
 }
 
@@ -305,6 +359,7 @@ function signOut() {
   if (window.liff && liff.isLoggedIn()) liff.logout();
   state.accessToken = null;
   state.dashboard = null;
+  state.isRefreshingToken = false;
   els.authSection.style.display = 'block';
   els.memberSection.style.display = 'none';
   els.logoutBtn.style.display = 'none';
@@ -330,7 +385,7 @@ async function bootstrap() {
       return;
     }
 
-    state.accessToken = liff.getAccessToken();
+    await refreshAccessToken();
     await bootstrapDashboard();
   } catch (error) {
     showMessage(normalizeError(error, '初始化失敗'), true);
