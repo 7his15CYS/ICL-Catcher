@@ -111,6 +111,38 @@ function toSafeNumber(value, fallback = Number.MAX_SAFE_INTEGER) {
   return Number.isFinite(num) ? num : fallback;
 }
 
+
+function getMemberBadgeHtml(member) {
+  const normalizedRole = String(member?.member_role || '').toLowerCase();
+  if (member?.is_admin) {
+    return {
+      access: true,
+      className: 'member-role-badge admin',
+      html: `
+        <span class="role-icon" aria-hidden="true">🛡</span>
+        <span class="role-text">管理員</span>
+      `,
+    };
+  }
+
+  if (normalizedRole === 'vip') {
+    return {
+      access: true,
+      className: 'member-role-badge vip',
+      html: `
+        <span class="vip-star" aria-hidden="true">★</span>
+        <span class="vip-text">VIP 會員</span>
+      `,
+    };
+  }
+
+  return {
+    access: false,
+    className: 'member-role-badge',
+    html: '<span class="role-text">一般會員</span>',
+  };
+}
+
 function getFeaturedRewards(rewards = []) {
   const featured = rewards
     .filter((reward) => reward?.is_featured === true)
@@ -206,8 +238,8 @@ function renderIchibanSummary(events) {
 function renderDashboard(data) {
   state.dashboard = data;
   const member = data.member || {};
-  const normalizedRole = String(member.member_role || '').toLowerCase();
-  const isVipMember = member.is_admin || normalizedRole === 'vip';
+  const badge = getMemberBadgeHtml(member);
+  const canAccessIchiban = badge.access;
 
   els.authSection.style.display = 'none';
   els.memberSection.style.display = 'block';
@@ -218,26 +250,17 @@ function renderDashboard(data) {
   els.memberAvatar.src = member.avatar_url || 'https://placehold.co/96x96?text=User';
   els.nicknameInput.value = member.nickname || member.display_name || '';
   els.memberRoleBadge.style.display = 'inline-flex';
-  els.memberRoleBadge.className = 'member-role-badge';
+  els.memberRoleBadge.className = badge.className;
+  els.memberRoleBadge.innerHTML = badge.html;
 
-  if (isVipMember) {
-    els.memberRoleBadge.classList.add('vip');
-    els.memberRoleBadge.innerHTML = `
-      <span class="vip-star" aria-hidden="true">★</span>
-      <span class="vip-text">VIP 會員</span>
-    `;
-  } else {
-    els.memberRoleBadge.textContent = '一般會員';
-  }
-
-  els.ichibanSection.style.display = isVipMember ? 'block' : 'none';
+  els.ichibanSection.style.display = canAccessIchiban ? 'block' : 'none';
   els.adminSection.style.display = member.is_admin ? 'block' : 'none';
 
   renderRewards(data.rewards || []);
   renderRedemptions(data.redemptions || []);
   renderLeaderboard(data.leaderboard || []);
 
-  if (isVipMember) {
+  if (canAccessIchiban) {
     renderIchibanSummary(data.ichiban_events || []);
   } else {
     els.ichibanSummary.innerHTML = '';
