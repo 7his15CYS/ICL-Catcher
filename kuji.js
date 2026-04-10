@@ -12,6 +12,7 @@ const state = {
   pollTimerId: null,
   localTurn: null,
   lastTurnStatusText: '',
+  isRefreshingToken: false,
 };
 const els = {
   loginBtn: document.getElementById('login-btn'),
@@ -52,7 +53,40 @@ function clearMessage(){ showMessage(''); }
 function setButtonLoading(button, loading, label='處理中...'){ if(!button) return; if(!button.dataset.originalText) button.dataset.originalText=button.textContent||''; button.disabled=loading; button.textContent=loading ? label : button.dataset.originalText; }
 function makeRequestId(prefix){ return window.crypto?.randomUUID ? `${prefix}-${window.crypto.randomUUID()}` : `${prefix}-${Date.now()}`; }
 function getCleanAppUrl(){ return `${window.location.origin}${window.location.pathname}${window.location.search}`; }
-async function callApi(action,payload={},includeToken=true){ const c=getConfig(); const body={action,...payload}; if(includeToken && state.accessToken) body.accessToken=state.accessToken; const res=await fetch(`${c.supabaseUrl}/functions/v1/${c.apiFunctionName}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:c.supabaseAnonKey},body:JSON.stringify(body)}); const text=await res.text(); let data={}; try{ data=text?JSON.parse(text):{}; }catch{ data={message:text}; } if(!res.ok||data.ok===false) throw data; return data; }
+function isTokenExpiredError(error){
+  const message = normalizeError(error, '').toLowerCase();
+  return (
+    message.includes('access token expired') ||
+    message.includes('invalid access token') ||
+    message.includes('line access token 驗證失敗') ||
+    message.includes('line profile 取得失敗') ||
+    message.includes('token expired')
+  );
+}
+async function refreshAccessToken(forceRelogin=false){
+  if(!window.liff) throw new Error('LIFF SDK 尚未載入');
+  if(state.isRefreshingToken) throw new Error('LINE 登入資訊更新中，請稍後再試');
+  state.isRefreshingToken = true;
+  try{
+    if(forceRelogin && liff.isLoggedIn()){
+      try{ liff.logout(); }catch(logoutError){ console.warn('LIFF logout failed before relogin:', logoutError); }
+    }
+    if(!liff.isLoggedIn()){
+      liff.login({ redirectUri:getCleanAppUrl() });
+      throw new Error('LINE 登入已失效，正在重新登入');
+    }
+    const accessToken = liff.getAccessToken();
+    if(!accessToken){
+      liff.login({ redirectUri:getCleanAppUrl() });
+      throw new Error('無法取得新的 LINE access token，正在重新登入');
+    }
+    state.accessToken = accessToken;
+    return accessToken;
+  } finally {
+    state.isRefreshingToken = false;
+  }
+}
+async function callApi(action,payload={},includeToken=true,options={}){ const c=getConfig(); const { retryOnExpiredToken=true } = options; const body={action,...payload}; if(includeToken && state.accessToken) body.accessToken=state.accessToken; const res=await fetch(`${c.supabaseUrl}/functions/v1/${c.apiFunctionName}`,{method:'POST',headers:{'Content-Type':'application/json',apikey:c.supabaseAnonKey},body:JSON.stringify(body)}); const text=await res.text(); let data={}; try{ data=text?JSON.parse(text):{}; }catch{ data={message:text}; } if(!res.ok||data.ok===false){ if(retryOnExpiredToken && isTokenExpiredError(data)){ await refreshAccessToken(true); return await callApi(action,payload,includeToken,{ retryOnExpiredToken:false }); } throw data; } return data; }
 function formatTicketNo(v){ return String(v ?? '').padStart(3,'0'); }
 function getMemberRole(member){ return String(member?.member_role || '').toLowerCase(); }
 function getMemberBadge(member){
@@ -377,7 +411,7 @@ async function loadCampaigns(){
     renderCurrentCampaign();
     return;
   }
-  const data = await callApi('get_kuji_campaigns', { accessToken: state.accessToken }, true);
+  const data = await callApi('get_kuji_campaigns');
   state.campaigns = data.campaigns || [];
   if(state.currentCampaignId && !state.campaigns.some(c=>Number(c.id)===Number(state.currentCampaignId))){
     state.currentCampaignId = state.campaigns[0] ? Number(state.campaigns[0].id) : null;
@@ -391,8 +425,7 @@ async function loadTicketWall(){
   if(!state.currentCampaignId || !canAccessKuji(state.member)) return;
   const data = await callApi('get_kuji_ticket_wall', {
     campaignId: state.currentCampaignId,
-    accessToken: state.accessToken,
-  }, true);
+  });
   state.ticketWall = data.tickets || [];
   if(state.currentDetail?.campaign && data.campaign){
     state.currentDetail.campaign = {
@@ -408,12 +441,10 @@ async function refreshCurrentCampaignState({ silent=false } = {}){
   const [detail, wall] = await Promise.all([
     callApi('get_kuji_campaign_detail', {
       campaignId: state.currentCampaignId,
-      accessToken: state.accessToken,
-    }, true),
+    }),
     callApi('get_kuji_ticket_wall', {
       campaignId: state.currentCampaignId,
-      accessToken: state.accessToken,
-    }, true),
+    }),
   ]);
   state.currentDetail = detail;
   applyTurnFromDetail(detail);
@@ -437,13 +468,11 @@ async function openCampaign(campaignId, silent=false){
   state.currentCampaignId = campaignId;
   const detail = await callApi('get_kuji_campaign_detail', {
     campaignId,
-    accessToken: state.accessToken,
-  }, true);
+  });
   
   const wall = await callApi('get_kuji_ticket_wall', {
     campaignId,
-    accessToken: state.accessToken,
-  }, true);
+  });
   state.currentDetail = detail;
   applyTurnFromDetail(detail);
   state.ticketWall = wall.tickets || [];
@@ -516,7 +545,7 @@ async function releaseCurrentTurn(){
   try{
     setButtonLoading(els.releaseTurnBtn, true, '釋放中...');
     clearMessage();
-    const result = await callApi('release_kuji_turn', { campaignId: state.currentCampaignId }, true);
+    const result = await callApi('release_kuji_turn', { campaignId: state.currentCampaignId });
     clearTurnState();
     await refreshCurrentCampaignState({ silent: true });
     showMessage(result.message || '已釋放抽籤控制權');
@@ -528,7 +557,7 @@ async function releaseCurrentTurn(){
 }
 
 async function signIn(){ if(!liff.isLoggedIn()){ liff.login({redirectUri:getCleanAppUrl()}); return; } await bootstrap(); }
-async function signOut(){ if(window.liff && liff.isLoggedIn()) liff.logout(); stopPollTimer(); clearTurnState(); state.accessToken=null; state.member=null; state.campaigns=[]; state.currentCampaignId=null; state.currentDetail=null; state.ticketWall=[]; renderMember(null); els.campaignList.innerHTML=''; renderCurrentCampaign(); showMessage('已登出'); }
+async function signOut(){ if(window.liff && liff.isLoggedIn()) liff.logout(); stopPollTimer(); clearTurnState(); state.accessToken=null; state.member=null; state.campaigns=[]; state.currentCampaignId=null; state.currentDetail=null; state.ticketWall=[]; state.isRefreshingToken=false; renderMember(null); els.campaignList.innerHTML=''; renderCurrentCampaign(); showMessage('已登出'); }
 
 async function bootstrap(){
   try{
@@ -536,7 +565,7 @@ async function bootstrap(){
     if(!c.liffId||!c.supabaseUrl||!c.supabaseAnonKey||!c.apiFunctionName) throw new Error('請先設定 config.js');
     await liff.init({ liffId:c.liffId, withLoginOnExternalBrowser:false });
     if(liff.isLoggedIn()){
-      state.accessToken = liff.getAccessToken();
+      await refreshAccessToken();
       const allowed = await loadDashboard();
       if(allowed){
         await loadCampaigns();
