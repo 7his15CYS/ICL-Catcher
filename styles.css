@@ -1111,6 +1111,26 @@ h3 {
   letter-spacing: 0.08em;
 }
 
+
+.member-role-badge.admin {
+  border-color: #55708d;
+  background: linear-gradient(180deg, #eef4fb 0%, #c6d6e8 100%);
+  color: #20364f;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 2px 4px rgba(32, 54, 79, 0.12);
+}
+
+.member-role-badge .role-icon {
+  font-size: 1em;
+  line-height: 1;
+}
+
+.member-role-badge .role-text {
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
 /* admin redesign 2026-04 */
 .admin-page {
   max-width: 1440px;
